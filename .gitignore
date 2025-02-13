@@ -3,3 +3,5 @@ src/__pycache__
 src/api/__pycache__
 src/api/routes/__pycache__
 src/core/__pycache__
+.env.grafana
+src/__pycache__/main.cpython-311.pyc
