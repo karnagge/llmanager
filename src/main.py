@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from prometheus_client import make_asgi_app
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -177,12 +178,75 @@ async def llm_backend_error_handler(
     )
 
 
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
 # Mount Prometheus metrics endpoint
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
 # Include API routes
 app.include_router(api_router, prefix="/api/v1")
+
+
+@app.get("/", response_class=HTMLResponse)
+async def home():
+    return """
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>LLM Backend API</title>
+        <style>
+            body {
+                font-family: monospace;
+                background: #1a1a1a;
+                color: #33ff33;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+            }
+            pre {
+                text-align: center;
+                font-size: 14px;
+                white-space: pre;
+            }
+            .links {
+                margin-top: 2em;
+            }
+            a {
+                color: #33ff33;
+                text-decoration: none;
+                margin: 0 1em;
+            }
+            a:hover {
+                text-decoration: underline;
+            }
+        </style>
+    </head>
+    <body>
+        <pre>
+         /\\__/\\
+        (=^.^=)   LLM Backend API
+        (")(")____/
+  
+     /\\_/\\
+    ( o.o ) Training...
+     > ^ <
+
+     🤖 Multi-tenant
+     🚀 OpenAI Compatible
+     ⚡ High Performance
+        </pre>
+        <div class="links">
+            <a href="/api/docs">📚 API Docs</a>
+            <a href="/api/redoc">📖 ReDoc</a>
+        </div>
+    </body>
+    </html>
+    """
 
 
 @app.get("/health")

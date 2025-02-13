@@ -50,14 +50,15 @@ class TenantMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        # Skip tenant check for health check, metrics, and API documentation endpoints
+        # Skip tenant check for public endpoints
         if request.url.path in [
+            "/",
             "/health",
             "/metrics",
             "/api/docs",
             "/api/redoc",
             "/openapi.json",
-        ]:
+        ] or request.url.path.startswith("/static/"):
             return await call_next(request)
 
         tenant_id = request.headers.get("X-Tenant-ID")
