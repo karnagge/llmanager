@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from prometheus_client import make_asgi_app
 
-from src.api.routes import api_router
+from src.api.router import api_router
 from src.core.config import get_settings
 from src.core.logging import setup_logging
 from src.core.middleware import (

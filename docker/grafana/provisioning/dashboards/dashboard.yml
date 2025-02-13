@@ -5,10 +5,6 @@ providers:
   - name: 'LLM Backend'
     # <int> org id. will default to orgId 1 if not specified
     orgId: 1
-    # <string> name of the dashboard folder. Required
-    folder: 'LLM Metrics'
-    # <string> folder UID. will be automatically generated if not specified
-    folderUid: 'llm_metrics'
     # <string> provider type. Default to 'file'
     type: file
     # <bool> disable dashboard deletion

@@ -1,28 +1,4 @@
 services:
-  api:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-    ports:
-      - "8000:8000"
-    environment:
-      - DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
-      - REDIS_URL=redis://redis:6379/0
-      - ENV=development
-      - SECRET_KEY=${SECRET_KEY}
-      - DEBUG=${DEBUG}
-      - LOG_LEVEL=${LOG_LEVEL}
-      - SHOW_API_DOCS=${SHOW_API_DOCS}
-    env_file:
-      - .env
-    depends_on:
-      - postgres
-      - redis
-    volumes:
-      - .:/app
-    networks:
-      - llmanager-network
-
   postgres:
     image: postgres:15
     environment:
@@ -62,8 +38,6 @@ services:
       - '--storage.tsdb.path=/prometheus'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
-    depends_on:
-      - api
     networks:
       - llmanager-network
 
@@ -78,7 +52,7 @@ services:
       - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
       - GF_USERS_ALLOW_SIGN_UP=false
     env_file:
-      - .env
+      - .env.grafana
     depends_on:
       - prometheus
     networks:
