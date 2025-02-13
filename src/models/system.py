@@ -73,7 +73,7 @@ class Webhook(Base, TimestampMixin):
     secret: Mapped[str] = mapped_column(String(64), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     events: Mapped[list] = mapped_column(JSON, nullable=False, default=list)
-    metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    webhook_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     # Relationships
     tenant: Mapped[Tenant] = relationship(back_populates="webhooks")
@@ -93,7 +93,7 @@ class AuditLog(Base, TimestampMixin):
     action: Mapped[str] = mapped_column(String(255), nullable=False)
     resource_type: Mapped[str] = mapped_column(String(255), nullable=False)
     resource_id: Mapped[str] = mapped_column(String(255), nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    audit_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
 
 class SystemMetrics(Base):
@@ -123,4 +123,4 @@ class BillingEvent(Base, TimestampMixin):
     amount: Mapped[float] = mapped_column(nullable=False)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="USD")
     description: Mapped[str] = mapped_column(String(1024), nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    billing_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)

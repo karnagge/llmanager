@@ -196,12 +196,17 @@ async def get_current_tenant_and_key(
         return tenant, api_key_obj
 
 
-async def check_permissions(
-    permissions: set, api_key_obj: APIKey = Depends(get_current_tenant_and_key)
-) -> None:
-    """Dependency to check API key permissions"""
-    if not await AuthService.verify_permissions(api_key_obj, permissions):
-        raise HTTPException(status_code=403, detail="Insufficient permissions")
+def check_permissions(required_permissions: set):
+    """Create a dependency that checks API key permissions"""
+
+    async def check_permissions_dependency(
+        tenant_key: tuple[Tenant, APIKey] = Depends(get_current_tenant_and_key),
+    ) -> None:
+        _, api_key = tenant_key
+        if not await AuthService.verify_permissions(api_key, required_permissions):
+            raise HTTPException(status_code=403, detail="Insufficient permissions")
+
+    return check_permissions_dependency
 
 
 # Convenience dependencies

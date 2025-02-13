@@ -36,7 +36,7 @@ class Settings(BaseSettings):
         if v:
             return v
         return PostgresDsn.build(
-            scheme="postgresql",
+            scheme="postgresql+asyncpg",
             username=values["POSTGRES_USER"],
             password=values["POSTGRES_PASSWORD"].get_secret_value(),
             host=values["POSTGRES_HOST"],

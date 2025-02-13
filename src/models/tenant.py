@@ -69,7 +69,7 @@ class UsageLog(Base):
     completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     total_tokens: Mapped[int] = mapped_column(Integer, nullable=False)
     cost: Mapped[float] = mapped_column(Float, nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    usage_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     # Relationships
     user: Mapped[User] = relationship(back_populates="usage_logs")
@@ -103,7 +103,7 @@ class ChatSession(Base, TimestampMixin):
     model: Mapped[str] = mapped_column(String(255), nullable=False)
     total_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     total_messages: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    session_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     # Relationships
     messages: Mapped[list["ChatMessage"]] = relationship(
@@ -126,7 +126,7 @@ class ChatMessage(Base):
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
-    metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    message_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
 
     # Relationships
     session: Mapped[ChatSession] = relationship(back_populates="messages")
@@ -147,4 +147,4 @@ class CacheEntry(Base):
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False
     )
-    metadata: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    cache_data: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
