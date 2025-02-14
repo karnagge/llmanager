@@ -74,6 +74,11 @@ export interface CreateWebhookDto {
   url: string;
   events: string[];
   secret?: string;
+  active?: boolean;
+}
+
+export interface UpdateWebhookDto extends Partial<CreateWebhookDto> {
+  active?: boolean;
 }
 
 export class SettingsService {
@@ -137,7 +142,7 @@ export class SettingsService {
   /**
    * Update webhook
    */
-  static async updateWebhook(id: string, data: Partial<CreateWebhookDto>): Promise<Webhook> {
+  static async updateWebhook(id: string, data: UpdateWebhookDto): Promise<Webhook> {
     const response = await api.patch<Webhook>(`${this.basePath}/webhooks/${id}`, data);
     return response.data;
   }

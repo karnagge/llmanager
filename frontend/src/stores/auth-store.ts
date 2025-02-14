@@ -1,107 +1,80 @@
-import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
-import { AuthService, AuthResponse } from '@/services/auth/auth-service';
+import { create } from "zustand";
+import { AuthService, type User, type LoginCredentials, type RegisterData } from "@/services/auth/auth-service";
 
 interface AuthState {
-  user: AuthResponse['user'] | null;
+  user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  error: string | null;
+  initialize: (initialState?: { user?: User | null; isAuthenticated?: boolean }) => Promise<void>;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  clearError: () => void;
+  register: (email: string, password: string, name: string) => Promise<void>;
 }
 
-export const useAuthStore = create<AuthState>()(
-  persist(
-    (set) => ({
-      user: null,
-      isAuthenticated: false,
-      isLoading: false,
-      error: null,
+export const useAuthStore = create<AuthState>()((set, get) => ({
+  user: null,
+  isAuthenticated: false,
+  isLoading: true,
 
-      login: async (email: string, password: string) => {
-        try {
-          set({ isLoading: true, error: null });
-          const response = await AuthService.login({ email, password });
-          
-          if (response.data) {
-            const { user, token, refreshToken } = response.data;
-            AuthService.setAuthToken(token);
-            AuthService.setRefreshToken(refreshToken);
-            
-            set({
-              user,
-              isAuthenticated: true,
-              isLoading: false,
-            });
-          }
-        } catch (error) {
-          set({
-            error: 'Falha ao fazer login. Verifique suas credenciais.',
-            isLoading: false,
-          });
-          throw error;
-        }
-      },
-
-      register: async (name: string, email: string, password: string) => {
-        try {
-          set({ isLoading: true, error: null });
-          const response = await AuthService.register({ name, email, password });
-          
-          if (response.data) {
-            const { user, token, refreshToken } = response.data;
-            AuthService.setAuthToken(token);
-            AuthService.setRefreshToken(refreshToken);
-            
-            set({
-              user,
-              isAuthenticated: true,
-              isLoading: false,
-            });
-          }
-        } catch (error) {
-          set({
-            error: 'Falha ao criar conta. Tente novamente.',
-            isLoading: false,
-          });
-          throw error;
-        }
-      },
-
-      logout: async () => {
-        try {
-          set({ isLoading: true });
-          await AuthService.logout();
-          AuthService.clearTokens();
-          
-          set({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-            error: null,
-          });
-        } catch (error) {
-          set({
-            error: 'Erro ao fazer logout.',
-            isLoading: false,
-          });
-          throw error;
-        }
-      },
-
-      clearError: () => {
-        set({ error: null });
-      },
-    }),
-    {
-      name: 'auth-storage',
-      partialize: (state) => ({
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
+  initialize: async (initialState) => {
+    if (initialState) {
+      set({
+        user: initialState.user ?? null,
+        isAuthenticated: initialState.isAuthenticated ?? false,
+        isLoading: false,
+      });
+      return;
     }
-  )
-);
+
+    try {
+      const token = localStorage.getItem("token");
+      if (!token) {
+        set({ isLoading: false });
+        return;
+      }
+
+      const user = await AuthService.getProfile();
+      set({ user, isAuthenticated: true, isLoading: false });
+    } catch (error) {
+      console.error("Failed to initialize auth:", error);
+      localStorage.removeItem("token");
+      set({ user: null, isAuthenticated: false, isLoading: false });
+    }
+  },
+
+  login: async (email: string, password: string) => {
+    try {
+      set({ isLoading: true });
+      const { user, token } = await AuthService.login({ email, password });
+      localStorage.setItem("token", token);
+      set({ user, isAuthenticated: true });
+    } catch (error) {
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+
+  logout: async () => {
+    try {
+      set({ isLoading: true });
+      await AuthService.logout();
+    } catch (error) {
+      console.error("Failed to logout:", error);
+    } finally {
+      localStorage.removeItem("token");
+      set({ user: null, isAuthenticated: false, isLoading: false });
+    }
+  },
+
+  register: async (email: string, password: string, name: string) => {
+    try {
+      set({ isLoading: true });
+      await AuthService.register({ email, password, name });
+    } catch (error) {
+      throw error;
+    } finally {
+      set({ isLoading: false });
+    }
+  },
+}));

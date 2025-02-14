@@ -1,46 +1,80 @@
 "use client";
 
-import { ReactNode, useEffect } from "react";
+import { createContext, useContext, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
-import { AuthService } from "@/services/auth/auth-service";
+import type { User } from "@/services/auth/auth-service";
 
-interface AuthProviderProps {
-  children: ReactNode;
+interface AuthContextType {
+  user: User | null;
+  isLoading: boolean;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+  register: (email: string, password: string, name: string) => Promise<void>;
 }
 
-export function AuthProvider({ children }: AuthProviderProps) {
-  const { isAuthenticated } = useAuthStore();
+export interface AuthProviderProps {
+  children: React.ReactNode;
+  initialState?: {
+    user?: User | null;
+    isAuthenticated?: boolean;
+  };
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
+
+export function AuthProvider({ children, initialState }: AuthProviderProps) {
+  const router = useRouter();
+  const {
+    user,
+    isLoading,
+    isAuthenticated,
+    initialize,
+    login: storeLogin,
+    logout: storeLogout,
+    register: storeRegister,
+  } = useAuthStore();
 
   useEffect(() => {
-    // Verifica se há um token no localStorage
-    const token = AuthService.getAuthToken();
-    const refreshToken = AuthService.getRefreshToken();
-
-    // Se houver token mas o estado não estiver autenticado
-    if (token && refreshToken && !isAuthenticated) {
-      const validateToken = async () => {
-        try {
-          // Tenta obter os dados do usuário
-          const response = await AuthService.me();
-          if (response.data) {
-            // Se conseguir, atualiza o estado com os dados do usuário
-            useAuthStore.setState({
-              user: response.data,
-              isAuthenticated: true,
-            });
-          } else {
-            // Se não conseguir, limpa os tokens
-            AuthService.clearTokens();
-          }
-        } catch {
-          // Em caso de erro, limpa os tokens
-          AuthService.clearTokens();
-        }
-      };
-
-      validateToken();
+    if (initialState) {
+      initialize(initialState);
+    } else {
+      initialize();
     }
-  }, [isAuthenticated]);
+  }, [initialize, initialState]);
 
-  return <>{children}</>;
+  const login = async (email: string, password: string) => {
+    await storeLogin(email, password);
+    router.push("/dashboard");
+  };
+
+  const logout = async () => {
+    await storeLogout();
+    router.push("/login");
+  };
+
+  const register = async (email: string, password: string, name: string) => {
+    await storeRegister(email, password, name);
+    router.push("/login");
+  };
+
+  const value = {
+    user,
+    isLoading,
+    isAuthenticated,
+    login,
+    logout,
+    register,
+  };
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+}
+
+export function useAuth() {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
 }

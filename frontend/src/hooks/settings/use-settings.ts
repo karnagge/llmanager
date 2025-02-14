@@ -25,13 +25,13 @@ const settingsKeys = {
 export function useSystemPreferences() {
   const queryClient = useQueryClient();
 
-  const query = useQuery({
+  const query = useQuery<SystemPreferences>({
     queryKey: settingsKeys.preferences(),
     queryFn: () => SettingsService.getPreferences(),
   });
 
-  const mutation = useMutation({
-    mutationFn: (data: Partial<SystemPreferences>) => SettingsService.updatePreferences(data),
+  const mutation = useMutation<SystemPreferences, Error, Partial<SystemPreferences>>({
+    mutationFn: (data) => SettingsService.updatePreferences(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.preferences() });
     },
@@ -48,20 +48,20 @@ export function useSystemPreferences() {
 export function useApiKeys() {
   const queryClient = useQueryClient();
 
-  const query = useQuery({
+  const query = useQuery<ApiKey[]>({
     queryKey: settingsKeys.apiKeys(),
     queryFn: () => SettingsService.getApiKeys(),
   });
 
-  const createMutation = useMutation({
-    mutationFn: (data: CreateApiKeyDto) => SettingsService.createApiKey(data),
+  const createMutation = useMutation<ApiKey, Error, CreateApiKeyDto>({
+    mutationFn: (data) => SettingsService.createApiKey(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.apiKeys() });
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => SettingsService.deleteApiKey(id),
+  const deleteMutation = useMutation<void, Error, string>({
+    mutationFn: (id) => SettingsService.deleteApiKey(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.apiKeys() });
     },
@@ -69,8 +69,8 @@ export function useApiKeys() {
 
   return {
     ...query,
-    createApiKey: createMutation.mutate,
-    deleteApiKey: deleteMutation.mutate,
+    createApiKey: createMutation.mutateAsync,
+    deleteApiKey: deleteMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isDeleting: deleteMutation.isPending,
   };
@@ -80,28 +80,31 @@ export function useApiKeys() {
 export function useWebhooks() {
   const queryClient = useQueryClient();
 
-  const query = useQuery({
+  const query = useQuery<Webhook[]>({
     queryKey: settingsKeys.webhooks(),
     queryFn: () => SettingsService.getWebhooks(),
   });
 
-  const createMutation = useMutation({
-    mutationFn: (data: CreateWebhookDto) => SettingsService.createWebhook(data),
+  const createMutation = useMutation<Webhook, Error, CreateWebhookDto>({
+    mutationFn: (data) => SettingsService.createWebhook(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.webhooks() });
     },
   });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<CreateWebhookDto> }) =>
-      SettingsService.updateWebhook(id, data),
+  const updateMutation = useMutation<
+    Webhook,
+    Error,
+    { id: string; data: Partial<CreateWebhookDto> }
+  >({
+    mutationFn: ({ id, data }) => SettingsService.updateWebhook(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.webhooks() });
     },
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => SettingsService.deleteWebhook(id),
+  const deleteMutation = useMutation<void, Error, string>({
+    mutationFn: (id) => SettingsService.deleteWebhook(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.webhooks() });
     },
@@ -109,9 +112,9 @@ export function useWebhooks() {
 
   return {
     ...query,
-    createWebhook: createMutation.mutate,
-    updateWebhook: updateMutation.mutate,
-    deleteWebhook: deleteMutation.mutate,
+    createWebhook: createMutation.mutateAsync,
+    updateWebhook: updateMutation.mutateAsync,
+    deleteWebhook: deleteMutation.mutateAsync,
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
@@ -122,13 +125,13 @@ export function useWebhooks() {
 export function useNotificationSettings() {
   const queryClient = useQueryClient();
 
-  const query = useQuery({
+  const query = useQuery<NotificationSettings>({
     queryKey: settingsKeys.notifications(),
     queryFn: () => SettingsService.getNotificationSettings(),
   });
 
-  const mutation = useMutation({
-    mutationFn: (data: Partial<NotificationSettings>) => SettingsService.updateNotificationSettings(data),
+  const mutation = useMutation<NotificationSettings, Error, Partial<NotificationSettings>>({
+    mutationFn: (data) => SettingsService.updateNotificationSettings(data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: settingsKeys.notifications() });
     },
@@ -136,7 +139,7 @@ export function useNotificationSettings() {
 
   return {
     ...query,
-    updateSettings: mutation.mutate,
+    updateSettings: mutation.mutateAsync,
     isUpdating: mutation.isPending,
   };
 }
@@ -150,7 +153,7 @@ export function useSystemLogs(params?: {
   limit?: number;
   offset?: number;
 }) {
-  return useQuery({
+  return useQuery<{ logs: SystemLog[]; total: number }>({
     queryKey: settingsKeys.log(params || {}),
     queryFn: () => SettingsService.getLogs(params),
   });
