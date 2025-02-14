@@ -47,12 +47,12 @@
   - [x] Relatórios programados
   - [x] Filtros avançados
 
-## 🚧 Gerenciamento de Grupos
-- [ ] CRUD de grupos
-- [ ] Associação de usuários
-- [ ] Permissões por grupo
-- [ ] Interface de membros
-- [ ] Histórico de alterações
+## ✅ Gerenciamento de Grupos
+- [x] CRUD de grupos
+- [x] Associação de usuários
+- [x] Permissões por grupo
+- [x] Interface de membros
+- [x] Histórico de alterações
 
 ## 🚧 Configurações
 - [ ] Preferências do sistema
@@ -94,17 +94,12 @@
 
 ## Próximas Etapas
 
-1. **Gerenciamento de Grupos**
-   - Criar interfaces de grupo
-   - Implementar controle de membros
-   - Adicionar histórico de alterações
-
-2. **Configurações do Sistema**
+1. **Configurações do Sistema**
    - Desenvolver página de configurações
    - Implementar gerenciamento de API keys
    - Adicionar configuração de webhooks
 
-3. **Testes e Documentação**
+2. **Testes e Documentação**
    - Configurar ambiente de testes
    - Escrever testes críticos
    - Documentar componentes no Storybook

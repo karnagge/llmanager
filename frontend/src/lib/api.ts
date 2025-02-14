@@ -49,7 +49,7 @@ class ApiClient {
     );
   }
 
-  async get<T>(url: string, params?: Record<string, unknown>): Promise<ApiResponse<T>> {
+  async get<T>(url: string, params?: Record<string, any>): Promise<ApiResponse<T>> {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.client.get(url, { params });
       return response.data;
@@ -59,7 +59,7 @@ class ApiClient {
     }
   }
 
-  async post<T>(url: string, data: Record<string, unknown>): Promise<ApiResponse<T>> {
+  async post<T, D = any>(url: string, data: D): Promise<ApiResponse<T>> {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.client.post(url, data);
       return response.data;
@@ -69,9 +69,19 @@ class ApiClient {
     }
   }
 
-  async put<T>(url: string, data: Record<string, unknown>): Promise<ApiResponse<T>> {
+  async put<T, D = any>(url: string, data: D): Promise<ApiResponse<T>> {
     try {
       const response: AxiosResponse<ApiResponse<T>> = await this.client.put(url, data);
+      return response.data;
+    } catch (error) {
+      this.handleError(error as AxiosError);
+      throw error;
+    }
+  }
+
+  async patch<T, D = any>(url: string, data: D): Promise<ApiResponse<T>> {
+    try {
+      const response: AxiosResponse<ApiResponse<T>> = await this.client.patch(url, data);
       return response.data;
     } catch (error) {
       this.handleError(error as AxiosError);
