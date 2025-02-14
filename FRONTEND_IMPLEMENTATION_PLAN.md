@@ -32,20 +32,20 @@
 - [x] Monitoramento de uso
 - [x] Gráficos de consumo
 
-## 🚧 Métricas e Analytics
-- [ ] Componentes de gráficos
+## ✅ Métricas e Analytics
+- [x] Componentes de gráficos
   - [x] Line Chart
-  - [ ] Bar Chart
-  - [ ] Area Chart
-  - [ ] Pie Chart
-- [ ] Integração com Grafana
-  - [ ] Cliente de API
-  - [ ] Embeddings de dashboards
-  - [ ] Configuração de datasources
-- [ ] Exportação de dados
-  - [ ] Download CSV/JSON
-  - [ ] Relatórios programados
-  - [ ] Filtros avançados
+  - [x] Bar Chart
+  - [x] Area Chart
+  - [x] Pie Chart
+- [x] Integração com Grafana
+  - [x] Cliente de API
+  - [x] Embeddings de dashboards
+  - [x] Configuração de datasources
+- [x] Exportação de dados
+  - [x] Download CSV/JSON
+  - [x] Relatórios programados
+  - [x] Filtros avançados
 
 ## 🚧 Gerenciamento de Grupos
 - [ ] CRUD de grupos
@@ -94,22 +94,17 @@
 
 ## Próximas Etapas
 
-1. **Métricas e Analytics**
-   - Implementar componentes de gráficos faltantes
-   - Integrar com Grafana
-   - Desenvolver sistema de exportação
-
-2. **Gerenciamento de Grupos**
+1. **Gerenciamento de Grupos**
    - Criar interfaces de grupo
    - Implementar controle de membros
    - Adicionar histórico de alterações
 
-3. **Configurações do Sistema**
+2. **Configurações do Sistema**
    - Desenvolver página de configurações
    - Implementar gerenciamento de API keys
    - Adicionar configuração de webhooks
 
-4. **Testes e Documentação**
+3. **Testes e Documentação**
    - Configurar ambiente de testes
    - Escrever testes críticos
    - Documentar componentes no Storybook

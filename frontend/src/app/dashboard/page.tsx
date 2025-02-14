@@ -3,12 +3,75 @@
 import { DashboardLayout } from "@/components/layout/dashboard-layout";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { LineChart } from "@/components/charts/line-chart";
+import { BarChart } from "@/components/charts/bar-chart";
 import {
   ChartBar,
   Database,
   Users,
   AlertCircle,
 } from "lucide-react";
+
+const chartData = [
+  {
+    date: "Jan 22",
+    "API Calls": 2890,
+    "Error Rate": 23,
+  },
+  {
+    date: "Feb 22",
+    "API Calls": 3890,
+    "Error Rate": 19,
+  },
+  {
+    date: "Mar 22",
+    "API Calls": 4200,
+    "Error Rate": 21,
+  },
+  {
+    date: "Apr 22",
+    "API Calls": 4500,
+    "Error Rate": 17,
+  },
+  {
+    date: "May 22",
+    "API Calls": 5100,
+    "Error Rate": 12,
+  },
+];
+
+const modelUsageData = [
+  {
+    date: "Segunda",
+    GPT4: 234,
+    GPT35: 456,
+    Claude: 321,
+  },
+  {
+    date: "Terça",
+    GPT4: 245,
+    GPT35: 438,
+    Claude: 367,
+  },
+  {
+    date: "Quarta",
+    GPT4: 289,
+    GPT35: 479,
+    Claude: 390,
+  },
+  {
+    date: "Quinta",
+    GPT4: 276,
+    GPT35: 523,
+    Claude: 405,
+  },
+  {
+    date: "Sexta",
+    GPT4: 302,
+    GPT35: 545,
+    Claude: 432,
+  },
+];
 
 export default function DashboardPage() {
   return (
@@ -42,6 +105,28 @@ export default function DashboardPage() {
             icon={<AlertCircle className="h-4 w-4" />}
             description="Últimas 24h"
             trend={{ value: 2, isPositive: false }}
+          />
+        </div>
+
+        {/* Charts Grid */}
+        <div className="grid gap-6 md:grid-cols-2">
+          <LineChart
+            title="Performance da API"
+            description="Chamadas da API e Taxa de Erro nos últimos 5 meses"
+            data={chartData}
+            index="date"
+            categories={["API Calls", "Error Rate"]}
+            colors={["emerald", "rose"]}
+            valueFormatter={(value) => `${value.toLocaleString()}`}
+          />
+          <BarChart
+            title="Uso por Modelo"
+            description="Requisições por modelo LLM na última semana"
+            data={modelUsageData}
+            index="date"
+            categories={["GPT4", "GPT35", "Claude"]}
+            colors={["indigo", "sky", "violet"]}
+            valueFormatter={(value) => `${value.toLocaleString()}`}
           />
         </div>
 

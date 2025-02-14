@@ -11,6 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { BarChart as TremorBarChart, Card as TremorCard } from "@tremor/react";
 
 interface DataPoint {
+  date: string;
   [key: string]: string | number;
 }
 
@@ -25,8 +26,11 @@ interface BarChartProps {
   isLoading?: boolean;
   className?: string;
   height?: string;
-  layout?: "vertical" | "horizontal";
   showLegend?: boolean;
+  showGridLines?: boolean;
+  showTooltip?: boolean;
+  showXAxis?: boolean;
+  showYAxis?: boolean;
 }
 
 export function BarChart({
@@ -35,13 +39,16 @@ export function BarChart({
   data,
   categories,
   index,
-  colors = ["blue"],
+  colors = ["emerald", "gray"],
   valueFormatter = (value) => value.toString(),
   isLoading = false,
   className,
   height = "h-72",
-  layout = "vertical",
   showLegend = true,
+  showGridLines = true,
+  showTooltip = true,
+  showXAxis = true,
+  showYAxis = true,
 }: BarChartProps) {
   if (isLoading) {
     return (
@@ -78,11 +85,11 @@ export function BarChart({
             categories={categories}
             colors={colors}
             valueFormatter={valueFormatter}
-            layout={layout}
             showLegend={showLegend}
-            showGridLines
-            showXAxis
-            showYAxis
+            showGridLines={showGridLines}
+            showTooltip={showTooltip}
+            showXAxis={showXAxis}
+            showYAxis={showYAxis}
           />
         </TremorCard>
       </CardContent>
