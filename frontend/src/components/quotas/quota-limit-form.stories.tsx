@@ -9,7 +9,7 @@ const Wrapper = (Story: any) => (
   </div>
 );
 
-const meta = {
+const meta: Meta<typeof QuotaLimitForm> = {
   title: 'Quotas/QuotaLimitForm',
   component: QuotaLimitForm,
   decorators: [Wrapper],
@@ -17,7 +17,7 @@ const meta = {
     layout: 'centered',
   },
   tags: ['autodocs'],
-} satisfies Meta<typeof QuotaLimitForm>;
+};
 
 export default meta;
 type Story = StoryObj<typeof QuotaLimitForm>;
@@ -29,6 +29,13 @@ export const Empty: Story = {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     },
     onCancel: action('onCancel'),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Formulário vazio para criar um novo limite de quota.',
+      },
+    },
   },
 };
 
@@ -50,6 +57,13 @@ export const WithInitialData: Story = {
     },
     onCancel: action('onCancel'),
   },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Formulário preenchido para editar um limite existente.',
+      },
+    },
+  },
 };
 
 export const WithError: Story = {
@@ -60,14 +74,28 @@ export const WithError: Story = {
     },
     onCancel: action('onCancel'),
   },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Estado do formulário quando ocorre um erro na submissão.',
+      },
+    },
+  },
 };
 
 export const Submitting: Story = {
   args: {
     onSubmit: async () => {
-      await new Promise((resolve) => setTimeout(resolve, 100000)); // Keep loading
+      await new Promise((resolve) => setTimeout(resolve, 100000));
     },
     onCancel: action('onCancel'),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Estado de carregamento durante a submissão do formulário.',
+      },
+    },
   },
 };
 
@@ -77,7 +105,7 @@ export const ValidationErrors: Story = {
       id: '1',
       tenantId: 'tenant-1',
       type: 'TOKENS',
-      limit: -100, // Invalid value to trigger validation
+      limit: -100,
       period: 'MONTHLY',
       used: 0,
       createdAt: new Date().toISOString(),
@@ -88,5 +116,12 @@ export const ValidationErrors: Story = {
       await new Promise((resolve) => setTimeout(resolve, 1000));
     },
     onCancel: action('onCancel'),
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Exibição de erros de validação nos campos do formulário.',
+      },
+    },
   },
 };

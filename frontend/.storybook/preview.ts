@@ -1,7 +1,44 @@
 import type { Preview } from "@storybook/react";
-import { withThemeByClassName } from '@storybook/addon-themes';
-import "./tailwind.css";
-import "../src/app/globals.css";
+import './tailwind.css';
+import '../src/app/globals.css';
+
+const BREAKPOINTS = {
+  mobile: 320,
+  tablet: 768,
+  laptop: 1024,
+  desktop: 1440,
+};
+
+const customViewports = {
+  mobile: {
+    name: 'Mobile',
+    styles: {
+      width: `${BREAKPOINTS.mobile}px`,
+      height: '100%',
+    },
+  },
+  tablet: {
+    name: 'Tablet',
+    styles: {
+      width: `${BREAKPOINTS.tablet}px`,
+      height: '100%',
+    },
+  },
+  laptop: {
+    name: 'Laptop',
+    styles: {
+      width: `${BREAKPOINTS.laptop}px`,
+      height: '100%',
+    },
+  },
+  desktop: {
+    name: 'Desktop',
+    styles: {
+      width: `${BREAKPOINTS.desktop}px`,
+      height: '100%',
+    },
+  },
+};
 
 const preview: Preview = {
   parameters: {
@@ -12,9 +49,16 @@ const preview: Preview = {
         date: /Date$/i,
       },
     },
+    darkMode: {
+      current: 'light',
+      darkClass: 'dark',
+      stylePreview: true,
+      classTarget: 'html',
+    },
     nextjs: {
       appDirectory: true,
     },
+    viewport: { viewports: customViewports },
     backgrounds: {
       default: 'light',
       values: [
@@ -22,16 +66,16 @@ const preview: Preview = {
         { name: 'dark', value: '#1a1a1a' },
       ],
     },
-  },
-  decorators: [
-    withThemeByClassName({
-      themes: {
-        light: '',
-        dark: 'dark',
+    docs: {
+      story: {
+        inline: true,
+        iframeHeight: 400,
       },
-      defaultTheme: 'light',
-    }),
-  ],
+      canvas: {
+        sourceState: 'shown',
+      },
+    },
+  },
 };
 
 export default preview;

@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { QuotaAlert } from './quota-alert';
 import { action } from '@storybook/addon-actions';
+import React from 'react';
 
 const meta: Meta<typeof QuotaAlert> = {
   title: 'Quotas/QuotaAlert',
@@ -27,12 +28,19 @@ export const LowAlert: Story = {
     },
     onDismiss: action('onDismiss'),
   },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Alerta de uso baixo (abaixo de 75%).',
+      },
+    },
+  },
 };
 
 export const MediumAlert: Story = {
   args: {
     alert: {
-      id: '2',
+      id: '1',
       tenantId: 'tenant-1',
       quotaId: 'quota-1',
       threshold: 80,
@@ -42,12 +50,19 @@ export const MediumAlert: Story = {
     },
     onDismiss: action('onDismiss'),
   },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Alerta de uso médio (entre 75% e 90%).',
+      },
+    },
+  },
 };
 
 export const HighAlert: Story = {
   args: {
     alert: {
-      id: '3',
+      id: '1',
       tenantId: 'tenant-1',
       quotaId: 'quota-1',
       threshold: 95,
@@ -57,26 +72,19 @@ export const HighAlert: Story = {
     },
     onDismiss: action('onDismiss'),
   },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Alerta de uso alto (acima de 90%).',
+      },
+    },
+  },
 };
 
 export const WithoutDismiss: Story = {
   args: {
     alert: {
-      id: '4',
-      tenantId: 'tenant-1',
-      quotaId: 'quota-1',
-      threshold: 85,
-      triggered: true,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    },
-  },
-};
-
-export const WithCustomClass: Story = {
-  args: {
-    alert: {
-      id: '5',
+      id: '1',
       tenantId: 'tenant-1',
       quotaId: 'quota-1',
       threshold: 75,
@@ -84,7 +92,12 @@ export const WithCustomClass: Story = {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     },
-    onDismiss: action('onDismiss'),
-    className: 'max-w-md shadow-lg',
+  },
+  parameters: {
+    docs: {
+      description: {
+        story: 'Alerta sem botão de descarte.',
+      },
+    },
   },
 };

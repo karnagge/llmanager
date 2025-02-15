@@ -1,0 +1,91 @@
+import { Meta } from '@storybook/blocks';
+
+<Meta title="Guia de Estilo/Introdução" />
+
+# Guia de Estilo LLManager
+
+Este guia documenta os princípios de design, componentes e padrões usados no LLManager.
+
+## Cores
+
+O LLManager usa um esquema de cores neutro com acentos coloridos para feedback e status:
+
+### Principal
+- Background: `bg-background`
+- Foreground: `text-foreground`
+- Muted: `text-muted-foreground`
+- Borders: `border-border`
+
+### Status
+- Sucesso: `text-green-500`, `bg-green-50`
+- Aviso: `text-yellow-500`, `bg-yellow-50`
+- Erro: `text-red-500`, `bg-red-50`
+- Info: `text-blue-500`, `bg-blue-50`
+
+### Tema Escuro
+O sistema suporta tema escuro automático usando as classes `dark:` do Tailwind.
+
+## Tipografia
+
+- Headings: Font-bold com tamanhos h1-h4
+- Corpo: Inter font-regular
+- Monospace: Para códigos e dados técnicos
+
+## Componentes
+
+### Cards
+Cards são usados para agrupar informações relacionadas. Exemplos:
+- StatCard: Para métricas e estatísticas
+- QuotaUsageRing: Para visualização de uso de quotas
+
+### Forms
+Forms seguem um padrão consistente:
+- Labels acima dos inputs
+- Validação em tempo real
+- Mensagens de erro em vermelho abaixo dos campos
+- Botões de ação alinhados à direita
+
+### Feedback
+- QuotaAlert: Para notificações de uso de quota
+- Toast: Para mensagens do sistema
+- Loading states: Spinners e skeletons
+
+## Layout
+
+- Container máximo: `max-w-7xl`
+- Espaçamento consistente: `spacing-4` (1rem) entre elementos
+- Grid system: `grid-cols-[1-12]` para layouts responsivos
+
+## Padrões de Interação
+
+1. Loading States
+- Botões mostram spinner durante ações
+- Skeletons para carregamento de conteúdo
+- Loading bars para operações longas
+
+2. Formulários
+- Validação em tempo real
+- Submit apenas quando válido
+- Feedback visual imediato
+
+3. Responsividade
+- Mobile-first design
+- Breakpoints padrão do Tailwind
+- Adaptação de layout baseada no viewport
+
+## Boas Práticas
+
+1. Acessibilidade
+- ARIA labels quando necessário
+- Contraste adequado
+- Suporte a navegação por teclado
+
+2. Performance
+- Lazy loading de imagens
+- Code splitting automático
+- Otimização de assets
+
+3. Manutenibilidade
+- Componentes reutilizáveis
+- Consistência em nomes de classes
+- Documentação em código
