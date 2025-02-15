@@ -78,12 +78,12 @@
 - [x] Tratamento de erros
 - [x] Loading states
 
-## 🚧 Testes
-- [ ] Configuração Jest/Testing Library
-- [ ] Testes unitários
-- [ ] Testes de integração
-- [ ] Testes E2E com Cypress
-- [ ] Cobertura de código
+## ✅ Testes
+- [x] Configuração Jest/Testing Library
+- [x] Testes unitários
+- [x] Testes de integração
+- [x] Testes E2E com Cypress
+- [x] Cobertura de código
 
 ## 🚧 Documentação
 - [ ] Storybook
@@ -97,13 +97,7 @@
 
 ## Próximas Etapas
 
-1. **Testes**
-   - Configurar ambiente de testes Jest/Testing Library
-   - Implementar testes unitários para componentes críticos
-   - Configurar Cypress para testes E2E
-   - Estabelecer pipeline de CI/CD
-
-2. **Documentação**
+1. **Documentação**
    - Configurar Storybook
    - Documentar componentes reutilizáveis
    - Criar guia de estilo
@@ -135,4 +129,4 @@
 
 ## Conclusão
 
-A implementação do frontend está praticamente concluída, com todas as funcionalidades principais implementadas e funcionando. Os próximos passos focam em qualidade de código, testes e documentação para garantir a manutenibilidade e escalabilidade do projeto.
+A implementação do frontend avançou significativamente com a conclusão da camada de testes. O próximo passo é a implementação do Storybook para documentação dos componentes, melhorando ainda mais a qualidade e manutenibilidade do projeto.

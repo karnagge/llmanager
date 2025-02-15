@@ -1,0 +1,20 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "bradlc.vscode-tailwindcss",
+    "ms-vscode.vscode-typescript-next",
+    "orta.vscode-jest",
+    "cypress-io.cypress",
+    "github.vscode-github-actions",
+    "mikestead.dotenv",
+    "streetsidesoftware.code-spell-checker",
+    "nrwl.angular-console",
+    "formulahendry.auto-rename-tag",
+    "formulahendry.auto-close-tag",
+    "christian-kohler.path-intellisense",
+    "dsznajder.es7-react-js-snippets",
+    "ms-vscode.vscode-typescript-tslint-plugin"
+  ],
+  "unwantedRecommendations": []
+}
