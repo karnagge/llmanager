@@ -1,61 +1,21 @@
-from typing import Any, Dict, List, Optional
-
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, Field
 
 from src.core.auth import get_current_tenant_and_key
 from src.core.database import get_tenant_db_session
 from src.models.system import APIKey, Tenant
+from src.schemas import (
+    ChatCompletionChoice,
+    ChatCompletionRequest,
+    ChatCompletionResponse,
+    ChatCompletionUsage,
+    ChatMessage,
+    ModelInfo,
+    ModelsResponse,
+)
 from src.services.model import get_model_service
 from src.services.quota import get_quota_service
 
 router = APIRouter()
-
-
-class Message(BaseModel):
-    """Chat message"""
-
-    role: str = Field(..., description="The role of the message sender")
-    content: str = Field(..., description="The message content")
-
-
-class ChatCompletionRequest(BaseModel):
-    """Chat completion request following OpenAI's format"""
-
-    model: str = Field(..., description="ID of the model to use")
-    messages: List[Message] = Field(
-        ..., description="List of messages in the conversation"
-    )
-    temperature: Optional[float] = Field(0.7, description="Sampling temperature")
-    max_tokens: Optional[int] = Field(None, description="Maximum tokens to generate")
-    stream: Optional[bool] = Field(False, description="Whether to stream responses")
-    user: Optional[str] = Field(None, description="End-user identifier")
-
-
-class Usage(BaseModel):
-    """Token usage information"""
-
-    prompt_tokens: int
-    completion_tokens: int
-    total_tokens: int
-
-
-class ChatCompletionResponse(BaseModel):
-    """Chat completion response following OpenAI's format"""
-
-    id: str
-    object: str = "chat.completion"
-    created: int
-    model: str
-    choices: List[Dict[str, Any]]
-    usage: Usage
-
-
-class ModelsResponse(BaseModel):
-    """Available models response"""
-
-    object: str = "list"
-    data: List[Dict[str, Any]]
 
 
 @router.post("/chat/completions", response_model=ChatCompletionResponse)
@@ -111,13 +71,15 @@ async def create_chat_completion(
                 created=int(result.get("created", 0)),
                 model=request.model,
                 choices=[
-                    {
-                        "index": 0,
-                        "message": {"role": "assistant", "content": result["content"]},
-                        "finish_reason": "stop",
-                    }
+                    ChatCompletionChoice(
+                        index=0,
+                        message=ChatMessage(
+                            role="assistant", content=result["content"]
+                        ),
+                        finish_reason="stop",
+                    )
                 ],
-                usage=Usage(
+                usage=ChatCompletionUsage(
                     prompt_tokens=result["usage"]["prompt_tokens"],
                     completion_tokens=result["usage"]["completion_tokens"],
                     total_tokens=result["usage"]["total_tokens"],
@@ -138,52 +100,53 @@ async def list_models(
     tenant, _ = tenant_key
 
     # Get available models based on tenant configuration
-    # This could be customized based on tenant settings
     models = [
-        {
-            "id": "gpt-4",
-            "object": "model",
-            "created": 1687882410,
-            "owned_by": "openai",
-            "permission": [],
-            "root": "gpt-4",
-            "parent": None,
-        },
-        {
-            "id": "gpt-3.5-turbo",
-            "object": "model",
-            "created": 1677649963,
-            "owned_by": "openai",
-            "permission": [],
-            "root": "gpt-3.5-turbo",
-            "parent": None,
-        },
+        ModelInfo(
+            id="gpt-4",
+            created=1687882410,
+            owned_by="openai",
+            permission=[],
+            root="gpt-4",
+            parent=None,
+        ),
+        ModelInfo(
+            id="gpt-3.5-turbo",
+            created=1677649963,
+            owned_by="openai",
+            permission=[],
+            root="gpt-3.5-turbo",
+            parent=None,
+        ),
     ]
 
     return ModelsResponse(data=models)
 
 
-@router.get("/models/{model}")
+@router.get("/models/{model}", response_model=ModelInfo)
 async def retrieve_model(
     model: str, tenant_key: tuple[Tenant, APIKey] = Depends(get_current_tenant_and_key)
-) -> Dict[str, Any]:
+) -> ModelInfo:
     """Retrieve model information"""
     tenant, _ = tenant_key
 
     # This could be customized based on tenant settings
     models = {
-        "gpt-4": {
-            "id": "gpt-4",
-            "object": "model",
-            "created": 1687882410,
-            "owned_by": "openai",
-        },
-        "gpt-3.5-turbo": {
-            "id": "gpt-3.5-turbo",
-            "object": "model",
-            "created": 1677649963,
-            "owned_by": "openai",
-        },
+        "gpt-4": ModelInfo(
+            id="gpt-4",
+            created=1687882410,
+            owned_by="openai",
+            permission=[],
+            root="gpt-4",
+            parent=None,
+        ),
+        "gpt-3.5-turbo": ModelInfo(
+            id="gpt-3.5-turbo",
+            created=1677649963,
+            owned_by="openai",
+            permission=[],
+            root="gpt-3.5-turbo",
+            parent=None,
+        ),
     }
 
     if model not in models:
