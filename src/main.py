@@ -1,8 +1,13 @@
-from fastapi import FastAPI, Request, status
+from typing import Any, Dict, List
+
+from fastapi import Depends, FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.utils import get_openapi
 from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import make_asgi_app
+from pydantic import BaseModel
 from sqlalchemy.exc import SQLAlchemyError
 
 from src.api.router import api_router
@@ -27,6 +32,27 @@ settings = get_settings()
 logger = get_logger(__name__)
 setup_logging()
 
+
+# API Models
+class ModelInfo(BaseModel):
+    id: str
+    object: str = "model"
+    created: int
+    owned_by: str
+    permission: List[Dict[str, Any]] = []
+    root: str = None
+    parent: str = None
+
+
+class ModelList(BaseModel):
+    data: List[ModelInfo]
+    object: str = "list"
+
+
+# Security
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+tenant_id_header = APIKeyHeader(name="X-Tenant-ID", auto_error=False)
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     version=settings.VERSION,
@@ -34,6 +60,77 @@ app = FastAPI(
     docs_url="/api/docs" if settings.SHOW_API_DOCS else None,
     redoc_url="/api/redoc" if settings.SHOW_API_DOCS else None,
 )
+
+
+def custom_openapi():
+    if app.openapi_schema:
+        return app.openapi_schema
+
+    openapi_schema = get_openapi(
+        title=settings.PROJECT_NAME,
+        version=settings.VERSION,
+        description="Multi-tenant LLM Backend with OpenAI-compatible API",
+        routes=app.routes,
+    )
+
+    # Security scheme definitions
+    openapi_schema["components"] = {
+        "securitySchemes": {
+            "ApiKeyAuth": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-API-Key",
+                "description": "API Key for authentication",
+            },
+            "TenantId": {
+                "type": "apiKey",
+                "in": "header",
+                "name": "X-Tenant-ID",
+                "description": "Tenant ID for multi-tenancy support",
+            },
+        },
+        "schemas": {
+            "ModelInfo": {
+                "title": "ModelInfo",
+                "type": "object",
+                "properties": {
+                    "id": {"type": "string"},
+                    "object": {"type": "string", "default": "model"},
+                    "created": {"type": "integer"},
+                    "owned_by": {"type": "string"},
+                    "permission": {
+                        "type": "array",
+                        "items": {"type": "object"},
+                        "default": [],
+                    },
+                    "root": {"type": "string", "nullable": True},
+                    "parent": {"type": "string", "nullable": True},
+                },
+                "required": ["id", "created", "owned_by"],
+            },
+            "ModelList": {
+                "title": "ModelList",
+                "type": "object",
+                "properties": {
+                    "data": {
+                        "type": "array",
+                        "items": {"$ref": "#/components/schemas/ModelInfo"},
+                    },
+                    "object": {"type": "string", "default": "list"},
+                },
+                "required": ["data"],
+            },
+        },
+    }
+
+    # Security requirement for all endpoints
+    openapi_schema["security"] = [{"ApiKeyAuth": [], "TenantId": []}]
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+app.openapi = custom_openapi
 
 # Set up CORS
 app.add_middleware(
@@ -185,7 +282,8 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
-# Include API routes
+# Include API routes with security
+api_router.dependencies = [Depends(api_key_header), Depends(tenant_id_header)]
 app.include_router(api_router, prefix="/api/v1")
 
 

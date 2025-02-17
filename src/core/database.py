@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Dict
 
 from sqlalchemy.ext.asyncio import (
@@ -114,7 +114,7 @@ def get_tenant_session_factory(tenant_id: str) -> async_sessionmaker[AsyncSessio
     return tenant_session_factories[tenant_id]
 
 
-@contextmanager
+@asynccontextmanager
 async def get_tenant_db_session(tenant_id: str) -> AsyncGenerator[AsyncSession, None]:
     """Get a database session for a tenant"""
     session_factory = get_tenant_session_factory(tenant_id)

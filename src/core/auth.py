@@ -6,6 +6,7 @@ from fastapi import Depends, HTTPException, Security
 from fastapi.security import APIKeyHeader
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import get_settings
@@ -89,12 +90,15 @@ class AuthService:
 
         # Query the API key
         result = await session.execute(
-            """
-            SELECT ak.*, t.is_active as tenant_is_active
+            text("""
+            SELECT ak.id, ak.tenant_id, ak.name, ak.key_hash, 
+                   ak.is_active, ak.permissions, ak.expires_at, 
+                   ak.last_used_at, ak.created_at, ak.updated_at,
+                   t.is_active as tenant_is_active
             FROM api_keys ak
             JOIN tenants t ON t.id = ak.tenant_id
             WHERE ak.key_hash = :key_hash
-            """,
+            """),
             {"key_hash": key_hash},
         )
         record = result.first()
@@ -102,14 +106,25 @@ class AuthService:
         if not record:
             return None
 
-        api_key_obj = record[0]
-        tenant_is_active = record.tenant_is_active
+        # Create API key object from record
+        api_key_obj = APIKey(
+            id=record.id,
+            tenant_id=record.tenant_id,
+            name=record.name,
+            key_hash=record.key_hash,
+            is_active=record.is_active,
+            permissions=record.permissions,
+            expires_at=record.expires_at,
+            last_used_at=record.last_used_at,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
 
-        # Validate key status
+        # Validate key and tenant status
         if not api_key_obj.is_active:
             raise InvalidAPIKeyError("API key is inactive")
 
-        if not tenant_is_active:
+        if not record.tenant_is_active:
             raise InvalidAPIKeyError("Tenant is inactive")
 
         if api_key_obj.expires_at and api_key_obj.expires_at < datetime.utcnow():
@@ -117,6 +132,7 @@ class AuthService:
 
         # Update last used timestamp
         api_key_obj.last_used_at = datetime.utcnow()
+        await session.merge(api_key_obj)
         await session.commit()
 
         return api_key_obj
