@@ -98,7 +98,6 @@ def setup_openapi(app: FastAPI) -> None:
             if "$defs" in schema:
                 for key, value in schema["$defs"].items():
                     openapi_schema["components"]["schemas"][f"{name}_{key}"] = value
-                del schema["$defs"]
 
                 # Update references in the schema
                 def update_refs(obj):
