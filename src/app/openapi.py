@@ -133,8 +133,11 @@ def setup_openapi(app: FastAPI) -> None:
             },
         }
 
-        # Add security requirement to all paths
-        openapi_schema["security"] = [{"ApiKeyAuth": [], "TenantId": []}]
+        # Add security requirements to specific paths
+        for path in openapi_schema["paths"].values():
+            for operation in path.values():
+                if operation.get("tags") and "LLM API" in operation["tags"]:
+                    operation["security"] = [{"ApiKeyAuth": [], "TenantId": []}]
 
         # Store the schema
         app.openapi_schema = openapi_schema

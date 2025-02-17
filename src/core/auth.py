@@ -19,7 +19,8 @@ from src.models.tenant import User, UserRole
 settings = get_settings()
 
 # Security schemes
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=True)
+tenant_id_header = APIKeyHeader(name="X-Tenant-ID", auto_error=True)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -195,10 +196,13 @@ class AuthService:
 
 async def get_current_tenant_and_key(
     api_key: str = Security(api_key_header),
+    tenant_provided_id: str = Security(tenant_id_header),
 ) -> tuple[Tenant, APIKey]:
     """Dependency to get current tenant and API key"""
     if not api_key:
         raise InvalidAPIKeyError("API key is required")
+    if not tenant_provided_id:
+        raise InvalidAPIKeyError("Tenant ID is required")
 
     async with get_tenant_db_session("system") as session:
         api_key_obj = await AuthService.validate_api_key(api_key, session)
@@ -208,6 +212,10 @@ async def get_current_tenant_and_key(
         tenant = await session.get(Tenant, api_key_obj.tenant_id)
         if not tenant:
             raise InvalidAPIKeyError("Tenant not found")
+
+        # Verify that the provided tenant ID matches the one from the API key
+        if tenant.id != tenant_provided_id:
+            raise InvalidAPIKeyError("Invalid tenant ID")
 
         return tenant, api_key_obj
 

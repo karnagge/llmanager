@@ -1,4 +1,4 @@
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.security import APIKeyHeader
 from fastapi.staticfiles import StaticFiles
 from prometheus_client import make_asgi_app
@@ -47,11 +47,11 @@ def create_app() -> FastAPI:
     app.mount("/metrics", metrics_app)
 
     # Security dependencies
-    api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-    tenant_id_header = APIKeyHeader(name="X-Tenant-ID", auto_error=False)
+    api_key_header = APIKeyHeader(name="X-API-Key", auto_error=True)
+    tenant_id_header = APIKeyHeader(name="X-Tenant-ID", auto_error=True)
 
-    # Include API routes with security
-    api_router.dependencies = [Depends(api_key_header), Depends(tenant_id_header)]
+    # Include API routes
+    # Note: Security dependencies are handled by the get_current_tenant_and_key dependency in the routes
     app.include_router(api_router, prefix="/api/v1")
 
     # Setup basic views
