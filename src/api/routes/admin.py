@@ -1,9 +1,8 @@
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel, Field
 from sqlalchemy import select
 
 from src.core.auth import AuthService, check_permissions, get_current_tenant_and_key
@@ -12,91 +11,21 @@ from src.core.exceptions import DatabaseError
 from src.core.utils import validate_tenant_config
 from src.models.system import APIKey, Tenant, Webhook
 from src.models.tenant import UsageLog
+from src.schemas import (
+    APIKeyCreate,
+    APIKeyResponse,
+    TenantCreate,
+    TenantResponse,
+    TenantUpdate,
+    WebhookCreate,
+    WebhookResponse,
+    WebhookUpdate,
+)
 
-router = APIRouter()
-
-
-# Request/Response Models
-class TenantCreate(BaseModel):
-    """Tenant creation request"""
-
-    name: str = Field(..., description="Tenant name")
-    quota_limit: int = Field(..., description="Token quota limit")
-    config: Dict = Field(default_factory=dict, description="Tenant configuration")
-
-
-class TenantUpdate(BaseModel):
-    """Tenant update request"""
-
-    name: Optional[str] = Field(None, description="Tenant name")
-    quota_limit: Optional[int] = Field(None, description="Token quota limit")
-    is_active: Optional[bool] = Field(None, description="Tenant status")
-    config: Optional[Dict] = Field(None, description="Tenant configuration")
+router = APIRouter(tags=["Admin"])
 
 
-class TenantResponse(BaseModel):
-    """Tenant response"""
-
-    id: str
-    name: str
-    is_active: bool
-    quota_limit: int
-    current_quota_usage: int
-    config: Dict
-    created_at: datetime
-    updated_at: datetime
-
-
-class APIKeyCreate(BaseModel):
-    """API key creation request"""
-
-    name: str = Field(..., description="Key name")
-    permissions: Dict = Field(default_factory=dict, description="Key permissions")
-    expires_at: Optional[datetime] = Field(None, description="Expiration date")
-
-
-class APIKeyResponse(BaseModel):
-    """API key response"""
-
-    id: str
-    name: str
-    key: Optional[str]  # Only included on creation
-    permissions: Dict
-    is_active: bool
-    expires_at: Optional[datetime]
-    created_at: datetime
-
-
-class WebhookCreate(BaseModel):
-    """Webhook creation request"""
-
-    url: str = Field(..., description="Webhook URL")
-    events: List[str] = Field(..., description="Event types to subscribe to")
-    metadata: Dict = Field(default_factory=dict, description="Additional metadata")
-
-
-class WebhookUpdate(BaseModel):
-    """Webhook update request"""
-
-    url: Optional[str] = Field(None, description="Webhook URL")
-    events: Optional[List[str]] = Field(None, description="Event types")
-    is_active: Optional[bool] = Field(None, description="Webhook status")
-    metadata: Optional[Dict] = Field(None, description="Additional metadata")
-
-
-class WebhookResponse(BaseModel):
-    """Webhook response"""
-
-    id: str
-    url: str
-    events: List[str]
-    is_active: bool
-    metadata: Dict
-    created_at: datetime
-    updated_at: datetime
-
-
-# Routes
+# Tenant Routes
 @router.post("/tenants", response_model=TenantResponse)
 async def create_tenant(
     tenant_data: TenantCreate,
@@ -125,7 +54,7 @@ async def create_tenant(
             session.add(tenant)
             await session.commit()
 
-            return TenantResponse.from_orm(tenant)
+            return TenantResponse.model_validate(tenant)
 
     except DatabaseError as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -142,7 +71,7 @@ async def list_tenants(
     async with get_tenant_db_session("system") as session:
         result = await session.execute(select(Tenant).offset(offset).limit(limit))
         tenants = result.scalars().all()
-        return [TenantResponse.from_orm(t) for t in tenants]
+        return [TenantResponse.model_validate(t) for t in tenants]
 
 
 @router.put("/tenants/{tenant_id}", response_model=TenantResponse)
@@ -174,9 +103,10 @@ async def update_tenant(
             tenant.config = update_data.config
 
         await session.commit()
-        return TenantResponse.from_orm(tenant)
+        return TenantResponse.model_validate(tenant)
 
 
+# API Key Routes
 @router.post("/tenants/{tenant_id}/api-keys", response_model=APIKeyResponse)
 async def create_api_key(
     tenant_id: str,
@@ -202,11 +132,12 @@ async def create_api_key(
         session.add(api_key)
         await session.commit()
 
-        response = APIKeyResponse.from_orm(api_key)
+        response = APIKeyResponse.model_validate(api_key)
         response.key = key  # Include raw key in response
         return response
 
 
+# Webhook Routes
 @router.post("/tenants/{tenant_id}/webhooks", response_model=WebhookResponse)
 async def create_webhook(
     tenant_id: str,
@@ -226,9 +157,55 @@ async def create_webhook(
         )
         session.add(webhook)
         await session.commit()
-        return WebhookResponse.from_orm(webhook)
+        return WebhookResponse.model_validate(webhook)
 
 
+@router.get("/tenants/{tenant_id}/webhooks", response_model=List[WebhookResponse])
+async def list_webhooks(
+    tenant_id: str,
+    tenant_key: tuple[Tenant, APIKey] = Depends(get_current_tenant_and_key),
+    permissions: None = Depends(check_permissions({"admin:read_webhook"})),
+) -> List[WebhookResponse]:
+    """List all webhooks for a tenant"""
+    async with get_tenant_db_session("system") as session:
+        result = await session.execute(
+            select(Webhook).where(Webhook.tenant_id == tenant_id)
+        )
+        webhooks = result.scalars().all()
+        return [WebhookResponse.model_validate(w) for w in webhooks]
+
+
+@router.put(
+    "/tenants/{tenant_id}/webhooks/{webhook_id}", response_model=WebhookResponse
+)
+async def update_webhook(
+    tenant_id: str,
+    webhook_id: str,
+    webhook_data: WebhookUpdate,
+    tenant_key: tuple[Tenant, APIKey] = Depends(get_current_tenant_and_key),
+    permissions: None = Depends(check_permissions({"admin:update_webhook"})),
+) -> WebhookResponse:
+    """Update a webhook"""
+    async with get_tenant_db_session("system") as session:
+        webhook = await session.get(Webhook, webhook_id)
+        if not webhook or webhook.tenant_id != tenant_id:
+            raise HTTPException(status_code=404, detail="Webhook not found")
+
+        # Update fields
+        if webhook_data.url is not None:
+            webhook.url = webhook_data.url
+        if webhook_data.events is not None:
+            webhook.events = webhook_data.events
+        if webhook_data.is_active is not None:
+            webhook.is_active = webhook_data.is_active
+        if webhook_data.metadata is not None:
+            webhook.metadata = webhook_data.metadata
+
+        await session.commit()
+        return WebhookResponse.model_validate(webhook)
+
+
+# Usage Statistics Routes
 @router.get("/tenants/{tenant_id}/usage")
 async def get_tenant_usage(
     tenant_id: str,

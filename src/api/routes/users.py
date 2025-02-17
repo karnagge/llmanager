@@ -1,77 +1,26 @@
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
-from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select
 
 from src.core.auth import AuthService, check_permissions, get_current_tenant_and_key
 from src.core.config import get_settings
 from src.core.database import get_tenant_db_session
 from src.models.system import APIKey, Tenant
-from src.models.tenant import UsageLog, User, UserRole
+from src.models.tenant import UsageLog, User
+from src.schemas import (
+    Token,
+    UserCreate,
+    UserResponse,
+    UserUpdate,
+)
 
 settings = get_settings()
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-
-
-# Request/Response Models
-class UserCreate(BaseModel):
-    """User creation request"""
-
-    email: EmailStr = Field(..., description="User email")
-    password: str = Field(..., min_length=8, description="User password")
-    name: str = Field(..., description="User name")
-    role: UserRole = Field(default=UserRole.USER, description="User role")
-    quota_limit: Optional[int] = Field(None, description="User token quota limit")
-    settings: Dict = Field(default_factory=dict, description="User settings")
-
-
-class UserUpdate(BaseModel):
-    """User update request"""
-
-    name: Optional[str] = Field(None, description="User name")
-    password: Optional[str] = Field(None, min_length=8, description="New password")
-    role: Optional[UserRole] = Field(None, description="User role")
-    is_active: Optional[bool] = Field(None, description="User status")
-    quota_limit: Optional[int] = Field(None, description="User token quota limit")
-    settings: Optional[Dict] = Field(None, description="User settings")
-
-
-class UserResponse(BaseModel):
-    """User response"""
-
-    id: str
-    email: str
-    name: str
-    role: UserRole
-    is_active: bool
-    quota_limit: Optional[int]
-    current_quota_usage: int
-    settings: Dict
-    last_login: Optional[datetime]
-    created_at: datetime
-    updated_at: datetime
-
-
-class Token(BaseModel):
-    """Token response"""
-
-    access_token: str
-    token_type: str
-    expires_in: int
-    refresh_token: Optional[str] = None
-
-
-class TokenData(BaseModel):
-    """Token data"""
-
-    sub: str
-    tenant_id: str
-    exp: datetime
 
 
 # Routes
@@ -153,7 +102,7 @@ async def create_user(
         session.add(user)
         await session.commit()
 
-        return UserResponse.from_orm(user)
+        return UserResponse.model_validate(user)
 
 
 @router.get("/users", response_model=List[UserResponse])
@@ -169,7 +118,7 @@ async def list_users(
     async with get_tenant_db_session(tenant.id) as session:
         result = await session.execute(select(User).offset(offset).limit(limit))
         users = result.scalars().all()
-        return [UserResponse.from_orm(u) for u in users]
+        return [UserResponse.model_validate(u) for u in users]
 
 
 @router.get("/users/{user_id}", response_model=UserResponse)
@@ -185,7 +134,7 @@ async def get_user(
         user = await session.get(User, user_id)
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
-        return UserResponse.from_orm(user)
+        return UserResponse.model_validate(user)
 
 
 @router.put("/users/{user_id}", response_model=UserResponse)
@@ -218,7 +167,7 @@ async def update_user(
             user.settings = update_data.settings
 
         await session.commit()
-        return UserResponse.from_orm(user)
+        return UserResponse.model_validate(user)
 
 
 @router.get("/users/{user_id}/usage")
