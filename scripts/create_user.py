@@ -1,28 +1,27 @@
 import asyncio
+import logging
 import uuid
 
 from sqlalchemy import text
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import sessionmaker
 
 from src.core.auth import AuthService
 from src.core.config import get_settings
-from src.core.database import create_async_engine
+from src.core.database import get_tenant_db_session
+from src.core.logging import get_logger
 from src.models.tenant import User, UserRole
+
+# Configure logging
+logging.basicConfig(level=logging.DEBUG)
+logger = get_logger(__name__)
 
 settings = get_settings()
 
 
 async def create_user():
-    # Connect directly to tenant_admin database
-    tenant_uri = str(settings.DATABASE_URI).replace("/tenant_system", "/tenant_admin")
-    tenant_engine = create_async_engine(tenant_uri, echo=True)
-    tenant_session = sessionmaker(
-        tenant_engine, class_=AsyncSession, expire_on_commit=False
-    )
-
     try:
-        async with tenant_session() as tsession:
+        # Connect directly to tenant_admin database
+        logger.info("Connecting to admin tenant database...")
+        async with get_tenant_db_session("admin") as session:
             # Create admin user
             user = User(
                 id=str(uuid.uuid4()),
@@ -35,46 +34,48 @@ async def create_user():
                 current_quota_usage=0,
                 settings={},
             )
-            tsession.add(user)
-            await tsession.commit()
-            print("Admin user created successfully")
+            session.add(user)
+            await session.commit()
+            logger.info("Admin user created successfully")
+            print("Admin user created:")
             print("Email: admin@example.com")
             print("Password: admin123")
 
-            # Verify tables and data
-            print("\nVerifying setup:")
+            # Verify setup
+            logger.info("Verifying setup...")
 
-            # Check tenant (should already exist from create_admin.py)
-            result = await tsession.execute(
+            # Check tenant exists
+            result = await session.execute(
                 text("SELECT id, name, quota_limit FROM tenants WHERE id = :tenant_id"),
                 {"tenant_id": "admin"},
             )
             tenant = result.fetchone()
             if tenant:
-                print(
-                    f"Verified tenant - ID: {tenant[0]}, Name: {tenant[1]}, Quota: {tenant[2]}"
+                logger.info(
+                    "Verified tenant",
+                    id=tenant[0],
+                    name=tenant[1],
+                    quota_limit=tenant[2],
                 )
             else:
-                print("Warning: Tenant not found in verification")
+                logger.error("Admin tenant not found in verification!")
+                raise ValueError("Admin tenant not found")
 
             # Check user
-            result = await tsession.execute(
+            result = await session.execute(
                 text("SELECT id, email, role FROM users WHERE email = :email"),
                 {"email": "admin@example.com"},
             )
             user = result.fetchone()
             if user:
-                print(
-                    f"Verified user - ID: {user[0]}, Email: {user[1]}, Role: {user[2]}"
-                )
+                logger.info("Verified user", id=user[0], email=user[1], role=user[2])
             else:
-                print("Warning: User not found in verification")
+                logger.error("Admin user not found in verification!")
+                raise ValueError("Admin user not found")
 
     except Exception as e:
-        print(f"Error creating user: {str(e)}")
+        logger.error(f"Error creating user: {str(e)}")
         raise
-    finally:
-        await tenant_engine.dispose()
 
 
 if __name__ == "__main__":

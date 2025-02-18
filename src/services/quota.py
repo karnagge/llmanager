@@ -3,9 +3,11 @@ from typing import Dict, Optional
 
 import httpx
 from sqlalchemy import select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import get_settings
+from src.core.database import get_tenant_db_session
 from src.core.exceptions import QuotaExceededError, WebhookDeliveryError
 from src.core.logging import get_logger
 from src.core.redis import get_redis
@@ -23,44 +25,53 @@ class QuotaService:
     async def check_quota(
         self, tenant_id: str, user_id: str, requested_tokens: int, session: AsyncSession
     ) -> None:
-        """
-        Check if requested tokens are within quota limits
+        """Check if requested tokens are within quota limits"""
+        try:
+            # Get tenant from system database
+            tenant = await session.get(Tenant, tenant_id)
+            if not tenant:
+                logger.error("tenant_not_found", tenant_id=tenant_id)
+                raise ValueError(f"Tenant not found: {tenant_id}")
 
-        Args:
-            tenant_id: Tenant identifier
-            user_id: User identifier
-            requested_tokens: Number of tokens being requested
-            session: Database session
+            # Get user from tenant database
+            async with get_tenant_db_session(tenant_id) as tenant_session:
+                user = await tenant_session.get(User, user_id)
+                if not user:
+                    logger.error("user_not_found", user_id=user_id, tenant_id=tenant_id)
+                    raise ValueError(f"User not found: {user_id}")
 
-        Raises:
-            QuotaExceededError: If quota would be exceeded
-        """
-        # Get current usage from Redis
-        redis = await get_redis()
-        usage = await redis.get_token_usage(tenant_id, user_id)
+                # Get current usage from Redis
+                redis = await get_redis()
+                usage = await redis.get_token_usage(tenant_id, user_id)
 
-        # Get tenant and user quota limits
-        tenant = await session.get(Tenant, tenant_id)
-        user = await session.get(User, user_id)
+                # Check tenant quota
+                tenant_usage = usage["tenant_usage"]
+                if tenant_usage + requested_tokens > tenant.quota_limit:
+                    raise QuotaExceededError(
+                        message="Tenant token quota exceeded",
+                        quota_limit=tenant.quota_limit,
+                        current_usage=tenant_usage,
+                    )
 
-        # Check tenant quota
-        tenant_usage = usage["tenant_usage"]
-        if tenant_usage + requested_tokens > tenant.quota_limit:
-            raise QuotaExceededError(
-                message="Tenant token quota exceeded",
-                quota_limit=tenant.quota_limit,
-                current_usage=tenant_usage,
+                # Check user quota if exists and set
+                user_usage = usage.get("user_usage", 0)
+                if user and user.quota_limit is not None:
+                    if user_usage + requested_tokens > user.quota_limit:
+                        raise QuotaExceededError(
+                            message="User token quota exceeded",
+                            quota_limit=user.quota_limit,
+                            current_usage=user_usage,
+                        )
+
+        except SQLAlchemyError as e:
+            logger.error(
+                "database_error",
+                error=str(e),
+                tenant_id=tenant_id,
+                user_id=user_id,
+                operation="check_quota",
             )
-
-        # Check user quota if exists and set
-        user_usage = usage.get("user_usage", 0)
-        if user and user.quota_limit is not None:
-            if user_usage + requested_tokens > user.quota_limit:
-                raise QuotaExceededError(
-                    message="User token quota exceeded",
-                    quota_limit=user.quota_limit,
-                    current_usage=user_usage,
-                )
+            raise
 
     async def update_usage(
         self,
@@ -73,95 +84,137 @@ class QuotaService:
         metadata: Optional[Dict] = None,
         session: AsyncSession = None,
     ) -> None:
-        """
-        Update token usage for tenant and user
+        """Update token usage for tenant and user"""
+        try:
+            total_tokens = prompt_tokens + completion_tokens
+            cost = calculate_token_cost(prompt_tokens, completion_tokens, model)
 
-        Args:
-            tenant_id: Tenant identifier
-            user_id: User identifier
-            prompt_tokens: Number of prompt tokens
-            completion_tokens: Number of completion tokens
-            model: Model identifier
-            request_id: Request identifier
-            metadata: Optional metadata about the request
-            session: Database session
-        """
-        total_tokens = prompt_tokens + completion_tokens
-        cost = calculate_token_cost(prompt_tokens, completion_tokens, model)
+            # Update Redis usage counters first
+            redis = await get_redis()
+            new_usage = await redis.update_token_quota(tenant_id, user_id, total_tokens)
 
-        # Update Redis usage counters
-        redis = await get_redis()
-        new_usage = await redis.update_token_quota(tenant_id, user_id, total_tokens)
+            logger.debug(
+                "updating_usage",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                total_tokens=total_tokens,
+                new_usage=new_usage,
+            )
 
-        # Create usage log entry
-        usage_log = UsageLog(
-            id=request_id,
-            user_id=user_id,
-            model=model,
-            prompt_tokens=prompt_tokens,
-            completion_tokens=completion_tokens,
-            total_tokens=total_tokens,
-            cost=cost,
-            metadata=metadata or {},
-        )
-        session.add(usage_log)
+            # Update tenant in system database
+            tenant = await session.get(Tenant, tenant_id)
+            if not tenant:
+                logger.error("tenant_not_found", tenant_id=tenant_id)
+                raise ValueError(f"Tenant not found: {tenant_id}")
 
-        # Update tenant usage in database
-        tenant = await session.get(Tenant, tenant_id)
-        tenant.current_quota_usage = new_usage["tenant_usage"]
+            tenant.current_quota_usage = new_usage["tenant_usage"]
+            await session.commit()
 
-        # Update user usage in database
-        user = await session.get(User, user_id)
-        user.current_quota_usage = new_usage["user_usage"]
+            # Update user and create usage log in tenant database
+            async with get_tenant_db_session(tenant_id) as tenant_session:
+                # Get user
+                user = await tenant_session.get(User, user_id)
+                if not user:
+                    logger.error("user_not_found", user_id=user_id, tenant_id=tenant_id)
+                    raise ValueError(f"User not found: {user_id}")
 
-        await session.commit()
+                # Update user usage
+                user.current_quota_usage = new_usage["user_usage"]
 
-        # Check if quota threshold is reached and notify
-        await self._check_quota_threshold(
-            tenant_id, tenant.quota_limit, new_usage["tenant_usage"], session
-        )
+                # Create usage log entry
+                usage_log = UsageLog(
+                    id=request_id,
+                    user_id=user_id,
+                    model=model,
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    total_tokens=total_tokens,
+                    cost=cost,
+                    metadata=metadata or {},
+                )
+                tenant_session.add(usage_log)
 
-    async def _check_quota_threshold(
+                # Commit changes to tenant database
+                await tenant_session.commit()
+                logger.debug(
+                    "tenant_usage_updated",
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    new_usage=new_usage,
+                )
+
+            # Check threshold without transaction
+            usage_percentage = (new_usage["tenant_usage"] / tenant.quota_limit) * 100
+            if usage_percentage >= settings.TOKEN_QUOTA_ALERT_THRESHOLD * 100:
+                await self._notify_quota_threshold(
+                    tenant_id=tenant_id,
+                    quota_limit=tenant.quota_limit,
+                    current_usage=new_usage["tenant_usage"],
+                    usage_percentage=usage_percentage,
+                )
+
+        except SQLAlchemyError as e:
+            logger.error(
+                "database_error",
+                error=str(e),
+                tenant_id=tenant_id,
+                user_id=user_id,
+                operation="update_usage",
+            )
+            raise
+
+    async def _notify_quota_threshold(
         self,
         tenant_id: str,
         quota_limit: int,
         current_usage: int,
-        session: AsyncSession,
+        usage_percentage: float,
     ) -> None:
-        """Check if quota threshold is reached and send notifications"""
-        usage_percentage = (current_usage / quota_limit) * 100
-
-        if usage_percentage >= settings.TOKEN_QUOTA_ALERT_THRESHOLD * 100:
-            # Get tenant's webhooks
-            result = await session.execute(
-                select(Webhook).where(
-                    Webhook.tenant_id == tenant_id,
-                    Webhook.is_active == True,
-                    Webhook.events.contains(["quota_threshold"]),
+        """Send notifications when quota threshold is reached"""
+        try:
+            # Get webhooks using system database
+            async with get_tenant_db_session("system") as session:
+                result = await session.execute(
+                    select(Webhook).where(
+                        Webhook.tenant_id == tenant_id,
+                        Webhook.is_active == True,
+                        Webhook.events.contains(["quota_threshold"]),
+                    )
                 )
+                webhooks = result.scalars().all()
+
+                for webhook in webhooks:
+                    try:
+                        await self._send_webhook_notification(
+                            webhook,
+                            "quota_threshold_reached",
+                            {
+                                "tenant_id": tenant_id,
+                                "quota_limit": quota_limit,
+                                "current_usage": current_usage,
+                                "usage_percentage": usage_percentage,
+                            },
+                        )
+                    except Exception as e:
+                        logger.error(
+                            "webhook_notification_failed",
+                            webhook_id=webhook.id,
+                            tenant_id=tenant_id,
+                            error=str(e),
+                        )
+
+        except Exception as e:
+            logger.error(
+                "quota_notification_error",
+                error=str(e),
+                tenant_id=tenant_id,
             )
-            webhooks = result.scalars().all()
-
-            # Send notifications
-            for webhook in webhooks:
-                await self._send_webhook_notification(
-                    webhook,
-                    "quota_threshold_reached",
-                    {
-                        "tenant_id": tenant_id,
-                        "quota_limit": quota_limit,
-                        "current_usage": current_usage,
-                        "usage_percentage": usage_percentage,
-                    },
-                )
 
     async def _send_webhook_notification(
         self, webhook: Webhook, event_type: str, data: Dict
     ) -> None:
         """Send webhook notification"""
         payload = format_webhook_payload(event_type, data)
-
-        # Get Redis for webhook status tracking
         redis = await get_redis()
 
         try:
@@ -180,8 +233,6 @@ class QuotaService:
                             timeout=10.0,
                         )
                         response.raise_for_status()
-
-                        # Success - update status and break
                         await redis.set_webhook_status(webhook.id, "success")
                         break
 
@@ -194,13 +245,11 @@ class QuotaService:
                         )
 
                         if attempt == settings.WEBHOOK_RETRY_ATTEMPTS - 1:
-                            # Final attempt failed
                             await redis.set_webhook_status(webhook.id, "failed")
                             raise WebhookDeliveryError(
                                 webhook_id=webhook.id, attempts=attempt + 1
                             )
 
-                        # Update status and wait before retry
                         await redis.set_webhook_status(webhook.id, "pending")
                         await httpx.AsyncClient.sleep(settings.WEBHOOK_RETRY_DELAY)
 

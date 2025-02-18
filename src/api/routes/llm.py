@@ -3,8 +3,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from src.core.auth import get_current_tenant_and_key
 from src.core.database import get_tenant_db_session
 from src.core.logging import get_logger
-
-logger = get_logger(__name__)
 from src.models.system import APIKey, Tenant
 from src.schemas import (
     ChatCompletionChoice,
@@ -18,6 +16,7 @@ from src.schemas import (
 from src.services.model import get_model_service
 from src.services.quota import get_quota_service
 
+logger = get_logger(__name__)
 router = APIRouter()
 
 
@@ -29,49 +28,46 @@ async def create_chat_completion(
     """Create a chat completion"""
     tenant, api_key = tenant_key
 
+    logger.debug(
+        "chat_completion_request",
+        tenant_id=tenant.id,
+        model=request.model,
+        message_count=len(request.messages),
+        user_id=request.user,
+    )
+
     # Get services
     try:
         model_service = await get_model_service()
-        logger.debug(f"Model service providers: {list(model_service.providers.keys())}")
+        quota_service = await get_quota_service()
+
         if not model_service.providers:
             raise HTTPException(
                 status_code=500,
                 detail="No model providers configured. Check your OpenAI API key configuration.",
             )
 
-        logger.debug(f"Getting quota service for tenant {tenant.id}")
-        quota_service = await get_quota_service()
-
-        # Log tenant details to verify quota_limit
-        logger.debug(
-            f"Tenant details - ID: {tenant.id}, Name: {tenant.name}, Quota Limit: {tenant.quota_limit}"
-        )
-
-        if not hasattr(tenant, "quota_limit"):
-            logger.error(f"Tenant {tenant.id} has no quota_limit attribute!")
-            raise HTTPException(
-                status_code=500,
-                detail="Tenant configuration error: missing quota_limit",
-            )
     except Exception as e:
-        logger.error(f"Failed to initialize services: {str(e)}")
+        logger.error("service_initialization_error", error=str(e), tenant_id=tenant.id)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to initialize services: {str(e)}",
         )
 
-    async with get_tenant_db_session(tenant.id) as session:
-        # Count tokens in the request
-        input_tokens = await model_service.count_tokens(
-            [msg.dict() for msg in request.messages], request.model
-        )
-
-        # Check quota before processing
-        await quota_service.check_quota(
-            tenant.id, request.user or "default", input_tokens, session
-        )
-
+    # Use system database for tenant operations
+    async with get_tenant_db_session("system") as session:
         try:
+            # Count tokens in the request
+            input_tokens = await model_service.count_tokens(
+                [msg.dict() for msg in request.messages], request.model
+            )
+            logger.debug("token_count", tenant_id=tenant.id, input_tokens=input_tokens)
+
+            # Check quota before processing
+            await quota_service.check_quota(
+                tenant.id, request.user or "default", input_tokens, session
+            )
+
             # Generate completion
             result = await model_service.generate(
                 [msg.dict() for msg in request.messages],
@@ -80,21 +76,37 @@ async def create_chat_completion(
                 max_tokens=request.max_tokens,
             )
 
-            # Update usage
-            await quota_service.update_usage(
-                tenant_id=tenant.id,
-                user_id=request.user or "default",
-                prompt_tokens=result["usage"]["prompt_tokens"],
-                completion_tokens=result["usage"]["completion_tokens"],
-                model=request.model,
-                request_id=api_key.id,  # Using API key ID as request ID
-                metadata={
-                    "temperature": request.temperature,
-                    "max_tokens": request.max_tokens,
-                    "api_key_id": api_key.id,
-                },
-                session=session,
-            )
+            # Update usage tracking
+            try:
+                await quota_service.update_usage(
+                    tenant_id=tenant.id,
+                    user_id=request.user or "default",
+                    prompt_tokens=result["usage"]["prompt_tokens"],
+                    completion_tokens=result["usage"]["completion_tokens"],
+                    model=request.model,
+                    request_id=api_key.id,
+                    metadata={
+                        "temperature": request.temperature,
+                        "max_tokens": request.max_tokens,
+                        "api_key_id": api_key.id,
+                    },
+                    session=session,
+                )
+                logger.debug(
+                    "usage_updated",
+                    tenant_id=tenant.id,
+                    user_id=request.user or "default",
+                    token_usage=result["usage"],
+                )
+            except Exception as e:
+                logger.error(
+                    "usage_update_error",
+                    error=str(e),
+                    tenant_id=tenant.id,
+                    user_id=request.user or "default",
+                )
+                # Continue since we have the model response
+                # but log the error for investigation
 
             return ChatCompletionResponse(
                 id=f"chatcmpl-{api_key.id}",
@@ -117,8 +129,15 @@ async def create_chat_completion(
             )
 
         except Exception as e:
+            logger.error(
+                "chat_completion_error",
+                error=str(e),
+                tenant_id=tenant.id,
+                user_id=request.user or "default",
+                error_type=e.__class__.__name__,
+            )
             raise HTTPException(
-                status_code=500, detail=f"Model generation failed: {str(e)}"
+                status_code=500, detail=f"Chat completion failed: {str(e)}"
             )
 
 
