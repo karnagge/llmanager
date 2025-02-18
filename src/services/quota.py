@@ -52,9 +52,9 @@ class QuotaService:
                 current_usage=tenant_usage,
             )
 
-        # Check user quota if set
-        if user.quota_limit:
-            user_usage = usage.get("user_usage", 0)
+        # Check user quota if exists and set
+        user_usage = usage.get("user_usage", 0)
+        if user and user.quota_limit is not None:
             if user_usage + requested_tokens > user.quota_limit:
                 raise QuotaExceededError(
                     message="User token quota exceeded",

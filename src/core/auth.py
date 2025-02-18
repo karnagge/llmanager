@@ -10,6 +10,9 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.config import get_settings
+from src.core.logging import get_logger
+
+logger = get_logger(__name__)
 from src.core.database import get_tenant_db_session
 from src.core.exceptions import InvalidAPIKeyError
 from src.core.utils import generate_hash
@@ -204,18 +207,53 @@ async def get_current_tenant_and_key(
     if not tenant_provided_id:
         raise InvalidAPIKeyError("Tenant ID is required")
 
+    logger.debug(
+        f"Validating tenant access - API Key: {api_key}, Tenant ID: {tenant_provided_id}"
+    )
     async with get_tenant_db_session("system") as session:
         api_key_obj = await AuthService.validate_api_key(api_key, session)
         if not api_key_obj:
             raise InvalidAPIKeyError("Invalid API key")
 
-        tenant = await session.get(Tenant, api_key_obj.tenant_id)
+        logger.debug(f"Found API key object for tenant: {api_key_obj.tenant_id}")
+
+        query = text("SELECT * FROM tenants WHERE id = :tenant_id")
+        result = await session.execute(query, {"tenant_id": api_key_obj.tenant_id})
+        tenant = result.fetchone()
+
         if not tenant:
+            logger.error(f"Tenant not found for ID: {api_key_obj.tenant_id}")
             raise InvalidAPIKeyError("Tenant not found")
+
+        logger.debug(f"Found tenant: {tenant}")
 
         # Verify that the provided tenant ID matches the one from the API key
         if tenant.id != tenant_provided_id:
+            logger.error(f"Tenant ID mismatch: {tenant.id} != {tenant_provided_id}")
             raise InvalidAPIKeyError("Invalid tenant ID")
+
+        # Instead of creating from row, get the tenant through SQLAlchemy
+        tenant = await session.get(Tenant, api_key_obj.tenant_id)
+        if not tenant:
+            logger.error(f"Tenant not found for ID: {api_key_obj.tenant_id}")
+            raise InvalidAPIKeyError("Tenant not found")
+
+        logger.debug(
+            f"Found tenant through SQLAlchemy - ID: {tenant.id}, Name: {tenant.name}, Quota: {tenant.quota_limit}"
+        )
+
+        if tenant.id != tenant_provided_id:
+            logger.error(f"Tenant ID mismatch: {tenant.id} != {tenant_provided_id}")
+            raise InvalidAPIKeyError("Invalid tenant ID")
+
+        # Ensure the tenant is loaded with all attributes
+        await session.refresh(tenant)
+
+        if tenant.quota_limit is None:
+            logger.error(f"Tenant {tenant.id} has null quota_limit!")
+            raise InvalidAPIKeyError(
+                "Invalid tenant configuration: quota_limit is null"
+            )
 
         return tenant, api_key_obj
 

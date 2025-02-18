@@ -38,7 +38,21 @@ async def create_chat_completion(
                 status_code=500,
                 detail="No model providers configured. Check your OpenAI API key configuration.",
             )
+
+        logger.debug(f"Getting quota service for tenant {tenant.id}")
         quota_service = await get_quota_service()
+
+        # Log tenant details to verify quota_limit
+        logger.debug(
+            f"Tenant details - ID: {tenant.id}, Name: {tenant.name}, Quota Limit: {tenant.quota_limit}"
+        )
+
+        if not hasattr(tenant, "quota_limit"):
+            logger.error(f"Tenant {tenant.id} has no quota_limit attribute!")
+            raise HTTPException(
+                status_code=500,
+                detail="Tenant configuration error: missing quota_limit",
+            )
     except Exception as e:
         logger.error(f"Failed to initialize services: {str(e)}")
         raise HTTPException(

@@ -55,16 +55,34 @@ async def create_admin():
 
             # Create admin tenant record
             logger.info("Creating admin tenant record...")
+            logger.info("Creating admin tenant with quota_limit=1000000...")
             tenant = Tenant(
                 id=tenant_id,
                 name="Admin Tenant",
                 db_name="tenant_admin",
                 quota_limit=1000000,
+                current_quota_usage=0,
                 config={"rate_limit": {"requests": 1000, "period": 3600}},
+                is_active=True,
             )
             session.add(tenant)
             await session.flush()
-            logger.info(f"Admin tenant created with ID: {tenant_id}")
+
+            # Verify tenant was created correctly
+            result = await session.execute(
+                text("SELECT id, name, quota_limit FROM tenants WHERE id = :id"),
+                {"id": tenant_id},
+            )
+            saved_tenant = result.fetchone()
+            logger.info(
+                f"Saved tenant - ID: {saved_tenant[0]}, Name: {saved_tenant[1]}, Quota: {saved_tenant[2]}"
+            )
+
+            if not saved_tenant[2]:  # quota_limit is the third column
+                logger.error("Tenant created but quota_limit is null!")
+                raise ValueError("Failed to save quota_limit")
+
+            logger.info(f"Admin tenant created successfully with ID: {tenant_id}")
 
             # Create API key
             logger.info("Creating API key...")
