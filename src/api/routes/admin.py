@@ -22,7 +22,7 @@ from src.schemas import (
     WebhookUpdate,
 )
 
-router = APIRouter(tags=["Admin"])
+router = APIRouter()
 
 
 # Tenant Routes

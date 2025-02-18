@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 from src.core.database import get_tenant_db_session
 from src.core.exceptions import InvalidAPIKeyError
 from src.core.utils import generate_hash
+from src.core.permissions import check_permissions as verify_permissions
 from src.models.system import APIKey, Tenant
 from src.models.tenant import User, UserRole
 
@@ -177,8 +178,8 @@ class AuthService:
             return False
 
         api_key_permissions = set(api_key_obj.permissions.get("scopes", []))
-        has_permission = check_permissions(required_permissions, api_key_permissions)
-        
+        has_permission = verify_permissions(required_permissions, api_key_permissions)
+
         if not has_permission:
             logger.warning(
                 "permission_check_failed",
@@ -186,7 +187,7 @@ class AuthService:
                 required=list(required_permissions),
                 granted=list(api_key_permissions)
             )
-        
+
         return has_permission
 
     @staticmethod
@@ -255,30 +256,25 @@ async def get_current_tenant_and_key(
 
 def check_permissions(required_permissions: set[str]):
     """Create a dependency that checks API key permissions"""
-
-    def check_permissions_dependency(
-        tenant_key: tuple[Tenant, APIKey] | None = None,
+    
+    async def check_permissions_dependency(
+        tenant_key: tuple[Tenant, APIKey] = Depends(get_current_tenant_and_key),
     ) -> None:
-        async def check_permissions_inner(
-            tenant_key: tuple[Tenant, APIKey] = Depends(get_current_tenant_and_key),
-        ) -> None:
-            _, api_key = tenant_key
-            api_key_permissions = api_key.permissions.get("scopes", [])
-            
-            if not await AuthService.verify_permissions(api_key, required_permissions):
-                raise HTTPException(
-                    status_code=403,
-                    detail={
-                        "message": "Insufficient permissions",
-                        "required": list(required_permissions),
-                        "granted": api_key_permissions,
-                        "tip": "Check the API key permissions documentation at /docs/PERMISSIONS.md"
-                    }
-                )
+        _, api_key = tenant_key
+        api_key_permissions = api_key.permissions.get("scopes", [])
         
-        return check_permissions_inner
-
-    return Depends(check_permissions_dependency())
+        if not await AuthService.verify_permissions(api_key, required_permissions):
+            raise HTTPException(
+                status_code=403,
+                detail={
+                    "message": "Insufficient permissions",
+                    "required": list(required_permissions),
+                    "granted": api_key_permissions,
+                    "tip": "Check the API key permissions documentation at /docs/PERMISSIONS.md"
+                }
+            )
+    
+    return check_permissions_dependency
 
 
 # Convenience dependencies
