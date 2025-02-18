@@ -2,12 +2,17 @@ import asyncio
 import logging
 import uuid
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 from src.core.auth import AuthService
 from src.core.config import get_settings
-from src.core.database import create_async_engine
+from src.core.database import (
+    create_async_engine,
+    create_tenant_database,
+    initialize_database,
+)
 from src.models.system import APIKey, Tenant
 
 # Configure logging
@@ -26,9 +31,30 @@ async def create_admin():
     async_session = sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
     try:
+        # Initialize system database first
+        logger.info("Initializing system database...")
+        await initialize_database()
+        logger.info("System database initialized successfully")
+
+        # Create the physical database first
+        logger.info("Creating admin database...")
+        await create_tenant_database("admin")
+        logger.info("Admin database created successfully")
+
         async with async_session() as session:
-            # Create admin tenant
-            logger.info("Creating admin tenant...")
+            # Check if admin tenant already exists
+            logger.info("Checking for existing admin tenant...")
+            result = await session.execute(
+                text("SELECT id FROM tenants WHERE id = 'admin'")
+            )
+            existing_tenant = result.scalar()
+
+            if existing_tenant:
+                logger.info("Admin tenant already exists, skipping creation")
+                return
+
+            # Create admin tenant record
+            logger.info("Creating admin tenant record...")
             tenant = Tenant(
                 id=tenant_id,
                 name="Admin Tenant",

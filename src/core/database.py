@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator, Dict
 
+import asyncpg
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -38,17 +39,23 @@ def get_tenant_db_url(tenant_id: str) -> str:
 async def create_tenant_database(tenant_id: str) -> None:
     """Create a new database for a tenant"""
     try:
-        # Connect to default database to create new tenant database
-        default_engine = create_async_engine(
-            str(settings.DATABASE_URI), poolclass=NullPool, echo=settings.DEBUG
-        )
-
+        # Get database connection info from settings
+        base_url = str(settings.DATABASE_URI)
+        dsn = base_url.replace("postgresql+asyncpg://", "postgresql://")
         db_name = get_tenant_database_name(tenant_id)
 
-        async with default_engine.connect() as conn:
-            await conn.execute(f'CREATE DATABASE "{db_name}"')
+        # Connect to postgres database
+        conn = await asyncpg.connect(
+            dsn,
+            database="postgres",
+        )
 
-        await default_engine.dispose()
+        try:
+            # Create new database
+            await conn.execute(f'DROP DATABASE IF EXISTS "{db_name}"')
+            await conn.execute(f'CREATE DATABASE "{db_name}"')
+        finally:
+            await conn.close()
 
         # Initialize schema in new tenant database
         tenant_engine = create_async_engine(
