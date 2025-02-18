@@ -47,7 +47,22 @@ def setup_openapi(app: FastAPI) -> None:
         openapi_schema = get_openapi(
             title=settings.PROJECT_NAME,
             version=settings.VERSION,
-            description="Multi-tenant LLM Backend with OpenAI-compatible API",
+            description="""
+Multi-tenant LLM Backend with OpenAI-compatible API
+
+Authentication is handled via API keys that identify both the tenant and user.
+Simply include your API key in the X-API-Key header for all requests.
+
+Example:
+```bash
+curl -X POST http://localhost:8000/api/v1/chat/completions \\
+  -H "X-API-Key: your_api_key" \\
+  -d '{
+    "model": "gpt-3.5-turbo",
+    "messages": [{"role": "user", "content": "Hello"}]
+  }'
+```
+            """,
             routes=app.routes,
             servers=[{"url": "/"}],
         )
@@ -117,20 +132,14 @@ def setup_openapi(app: FastAPI) -> None:
             # Add the main schema
             openapi_schema["components"]["schemas"][name] = schema
 
-        # Security scheme definitions
+        # Security scheme definition
         openapi_schema["components"]["securitySchemes"] = {
             "ApiKeyAuth": {
                 "type": "apiKey",
                 "in": "header",
                 "name": "X-API-Key",
-                "description": "API Key for authentication",
-            },
-            "TenantId": {
-                "type": "apiKey",
-                "in": "header",
-                "name": "X-Tenant-ID",
-                "description": "Tenant ID for multi-tenancy support",
-            },
+                "description": "API Key for authentication and tenant/user identification",
+            }
         }
 
         # Add security requirements to paths that need authentication
@@ -144,7 +153,7 @@ def setup_openapi(app: FastAPI) -> None:
                 if (
                     "parameters" in operation
                     and any(
-                        param.get("name") in ["X-API-Key", "X-Tenant-ID"]
+                        param.get("name") == "X-API-Key"
                         for param in operation["parameters"]
                     )
                 ) or (
@@ -154,7 +163,7 @@ def setup_openapi(app: FastAPI) -> None:
                         for tag in operation["tags"]
                     )
                 ):
-                    operation["security"] = [{"ApiKeyAuth": [], "TenantId": []}]
+                    operation["security"] = [{"ApiKeyAuth": []}]
 
         # Store the schema
         app.openapi_schema = openapi_schema

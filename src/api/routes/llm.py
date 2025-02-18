@@ -34,8 +34,7 @@ async def create_chat_completion(
         "chat_completion_request",
         tenant_id=tenant.id,
         model=request.model,
-        message_count=len(request.messages),
-        user_id=request.user,
+        message_count=len(request.messages)
     )
 
     # Get services
@@ -67,7 +66,7 @@ async def create_chat_completion(
 
             # Check quota before processing
             await quota_service.check_quota(
-                tenant.id, request.user or "default", input_tokens, session
+                tenant.id, api_key.user_id, input_tokens, session, api_key
             )
 
             # Generate completion
@@ -82,7 +81,7 @@ async def create_chat_completion(
             try:
                 await quota_service.update_usage(
                     tenant_id=tenant.id,
-                    user_id=request.user or "default",
+                    user_id=api_key.user_id,
                     prompt_tokens=result["usage"]["prompt_tokens"],
                     completion_tokens=result["usage"]["completion_tokens"],
                     model=request.model,
@@ -91,14 +90,16 @@ async def create_chat_completion(
                         "temperature": request.temperature,
                         "max_tokens": request.max_tokens,
                         "api_key_id": api_key.id,
-                        "provider": result.get("provider", "openai"),  # Add provider from model result
+                        "provider": result.get("provider", "openai"),
+                        "quota_limit": api_key.quota_limit,  # Include API key quota for tracking
                     },
                     session=session,
+                    api_key=api_key,  # Pass API key for quota tracking
                 )
                 logger.debug(
                     "usage_updated",
                     tenant_id=tenant.id,
-                    user_id=request.user or "default",
+                    user_id=api_key.user_id or "default",
                     token_usage=result["usage"],
                 )
             except Exception as e:
@@ -106,7 +107,7 @@ async def create_chat_completion(
                     "usage_update_error",
                     error=str(e),
                     tenant_id=tenant.id,
-                    user_id=request.user or "default",
+                    user_id=api_key.user_id or "default",
                 )
                 # Continue since we have the model response
                 # but log the error for investigation
@@ -136,7 +137,7 @@ async def create_chat_completion(
                 "chat_completion_error",
                 error=str(e),
                 tenant_id=tenant.id,
-                user_id=request.user or "default",
+                user_id=api_key.user_id or "default",
                 error_type=e.__class__.__name__,
             )
             raise HTTPException(

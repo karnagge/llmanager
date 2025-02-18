@@ -62,15 +62,19 @@ class TenantMiddleware(BaseHTTPMiddleware):
         ] or request.url.path.startswith("/static/"):
             return await call_next(request)
 
-        tenant_id = request.headers.get("X-Tenant-ID")
-        if not tenant_id:
-            raise TenantNotFoundError("Tenant ID not provided in request headers")
-
-        # Set tenant context
-        tenant_id_ctx.set(tenant_id)
-
-        # TODO: Validate tenant exists and is active
-        # This will be implemented when we add the tenant service
+        # Skip tenant checks for public endpoints and handle tenant validation in auth
+        if request.url.path not in [
+            "/api/v1/health",
+            "/health",
+            "/metrics",
+            "/api/docs",
+            "/api/redoc",
+            "/openapi.json",
+        ] and not request.url.path.startswith("/static/"):
+            # We'll get tenant context from the API key in auth service
+            api_key = request.headers.get("X-API-Key")
+            if not api_key:
+                raise TenantNotFoundError("API key not provided in request headers")
 
         response = await call_next(request)
         return response

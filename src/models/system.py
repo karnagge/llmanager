@@ -1,7 +1,10 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String
+from sqlalchemy import (
+    JSON, Boolean, DateTime, ForeignKey, ForeignKeyConstraint,
+    Integer, String
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
@@ -49,15 +52,21 @@ class APIKey(Base, TimestampMixin):
     tenant_id: Mapped[str] = mapped_column(
         String(36), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False
     )
+    user_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     key_hash: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     last_used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True))
     permissions: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    quota_limit: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    current_quota_usage: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Relationships
     tenant: Mapped[Tenant] = relationship(back_populates="api_keys")
+
+    # Note: user_id is validated at application level since it references
+    # a table in a different database
 
 
 class Webhook(Base, TimestampMixin):

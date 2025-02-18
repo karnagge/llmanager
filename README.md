@@ -15,6 +15,14 @@ A scalable backend service that provides OpenAI-compatible API endpoints for man
 - Prometheus metrics
 - Grafana dashboards
 
+## Documentation
+
+See the following guides for detailed documentation:
+
+- [API Key Migration Guide](docs/API_KEY_MIGRATION.md) - Guide for migrating to API key-based user identification
+- [Architecture Overview](ARCHITECTURE.md) - System architecture and design decisions
+- [Contributing Guidelines](CONTRIBUTING.md) - How to contribute to the project
+
 ## Development
 
 The project uses Poetry for dependency management and Docker for containerization.

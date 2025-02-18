@@ -81,18 +81,20 @@ class RedisService:
         return True
 
     async def update_token_quota(
-        self, tenant_id: str, user_id: str, tokens: int
+        self, tenant_id: str, user_id: str, tokens: int,
+        api_key_id: Optional[str] = None
     ) -> Dict[str, int]:
         """
-        Update token usage quota for tenant and user
+        Update token usage quota for tenant, user and optionally API key
 
         Args:
             tenant_id: Tenant identifier
             user_id: User identifier
             tokens: Number of tokens to add to usage
+            api_key_id: Optional API key identifier
 
         Returns:
-            Dict containing current usage for tenant and user
+            Dict containing current usage for tenant, user and optionally API key
         """
         tenant_key = f"token_quota:{tenant_id}"
         user_key = f"token_quota:{tenant_id}:{user_id}"
@@ -103,17 +105,30 @@ class RedisService:
             pipe.incrby(user_key, tokens)
             tenant_usage, user_usage = await pipe.execute()
 
-        return {"tenant_usage": int(tenant_usage), "user_usage": int(user_usage)}
+        result = {
+            "tenant_usage": int(tenant_usage),
+            "user_usage": int(user_usage)
+        }
+
+        # Update API key quota if provided
+        if api_key_id:
+            api_key = f"token_quota:{tenant_id}:{user_id}:{api_key_id}"
+            api_key_usage = await self.redis.incrby(api_key, tokens)
+            result["api_key_usage"] = int(api_key_usage)
+
+        return result
 
     async def get_token_usage(
-        self, tenant_id: str, user_id: Optional[str] = None
+        self, tenant_id: str, user_id: Optional[str] = None,
+        api_key_id: Optional[str] = None
     ) -> Dict[str, int]:
         """
-        Get current token usage for tenant and optionally user
+        Get current token usage for tenant, user and optionally API key
 
         Args:
             tenant_id: Tenant identifier
             user_id: Optional user identifier
+            api_key_id: Optional API key identifier
 
         Returns:
             Dict containing current usage
@@ -127,6 +142,11 @@ class RedisService:
             user_key = f"token_quota:{tenant_id}:{user_id}"
             user_usage = await self.redis.get(user_key)
             result["user_usage"] = int(user_usage or 0)
+
+            if api_key_id:
+                api_key = f"token_quota:{tenant_id}:{user_id}:{api_key_id}"
+                api_key_usage = await self.redis.get(api_key)
+                result["api_key_usage"] = int(api_key_usage or 0)
 
         return result
 

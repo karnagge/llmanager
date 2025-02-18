@@ -56,7 +56,10 @@ graph TD
 ## Security Architecture
 
 ### Authentication & Authorization
-1. Bearer token authentication
+1. API key-based authentication
+   - Each API key is associated with a user and tenant
+   - API keys can have individual quota limits
+   - Simplified OpenAI-compatible design
 2. Role-based access control (RBAC)
 3. Tenant isolation at database level
 4. API key rotation and revocation

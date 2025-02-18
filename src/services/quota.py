@@ -24,7 +24,8 @@ class QuotaService:
     """Service for managing token quotas and usage tracking"""
 
     async def check_quota(
-        self, tenant_id: str, user_id: str, requested_tokens: int, session: AsyncSession
+        self, tenant_id: str, user_id: str, requested_tokens: int, session: AsyncSession,
+        api_key: Optional["APIKey"] = None  # Type hint as string to avoid circular import
     ) -> None:
         """Check if requested tokens are within quota limits"""
         try:
@@ -43,7 +44,7 @@ class QuotaService:
 
                 # Get current usage from Redis
                 redis = await get_redis()
-                usage = await redis.get_token_usage(tenant_id, user_id)
+                usage = await redis.get_token_usage(tenant_id, user_id, api_key.id if api_key else None)
 
                 # Check tenant quota
                 tenant_usage = usage["tenant_usage"]
@@ -62,6 +63,16 @@ class QuotaService:
                             message="User token quota exceeded",
                             quota_limit=user.quota_limit,
                             current_usage=user_usage,
+                        )
+
+                # Check API key quota if exists
+                if api_key and api_key.quota_limit is not None:
+                    api_key_usage = usage.get("api_key_usage", 0)
+                    if api_key_usage + requested_tokens > api_key.quota_limit:
+                        raise QuotaExceededError(
+                            message="API key token quota exceeded",
+                            quota_limit=api_key.quota_limit,
+                            current_usage=api_key_usage,
                         )
 
         except SQLAlchemyError as e:
@@ -84,6 +95,7 @@ class QuotaService:
         request_id: str,
         metadata: Optional[Dict] = None,
         session: AsyncSession = None,
+        api_key: Optional["APIKey"] = None,  # Type hint as string to avoid circular import
     ) -> None:
         """Update token usage for tenant and user"""
         try:
@@ -101,7 +113,12 @@ class QuotaService:
 
             # First update Redis counters
             redis = await get_redis()
-            new_usage = await redis.update_token_quota(tenant_id, user_id, total_tokens)
+            new_usage = await redis.update_token_quota(
+                tenant_id,
+                user_id,
+                total_tokens,
+                api_key.id if api_key else None
+            )
 
             # Update tenant quota in system database
             tenant = await session.get(Tenant, tenant_id)
@@ -116,6 +133,16 @@ class QuotaService:
                 tenant_id=tenant_id,
                 current_usage=new_usage["tenant_usage"],
             )
+
+            # Update API key quota if applicable
+            if api_key and api_key.quota_limit is not None:
+                api_key.current_quota_usage = new_usage.get("api_key_usage", 0)
+                await session.commit()
+                logger.debug(
+                    "api_key_quota_updated",
+                    api_key_id=api_key.id,
+                    current_usage=api_key.current_quota_usage,
+                )
 
             # Update user quota and usage log in tenant database
             async with get_tenant_db_session(tenant_id) as tenant_session:

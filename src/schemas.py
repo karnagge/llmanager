@@ -107,20 +107,25 @@ class TenantResponse(TenantBase, TimestampMixin):
 class APIKeyBase(BaseModel):
     name: str
     permissions: Dict[str, Any] = {}
+    quota_limit: Optional[int] = Field(None, description="API key token quota limit")
 
 
 class APIKeyCreate(APIKeyBase):
     tenant_id: str
+    user_id: str = Field(..., description="Associated user ID")
     expires_at: Optional[datetime] = Field(None, description="Expiration date")
 
 
 class APIKeyResponse(APIKeyBase, TimestampMixin):
     id: str
     tenant_id: str
+    user_id: str
     key: Optional[str]  # Only included on creation
     is_active: bool
     expires_at: Optional[datetime] = None
     last_used_at: Optional[datetime] = None
+    quota_limit: Optional[int] = None
+    current_quota_usage: int = 0
 
     class Config:
         from_attributes = True
@@ -196,7 +201,6 @@ class ChatCompletionRequest(BaseModel):
     temperature: Optional[float] = 0.7
     max_tokens: Optional[int] = None
     stream: Optional[bool] = False
-    user: Optional[str] = None
 
 
 class ChatCompletionChoice(BaseModel):

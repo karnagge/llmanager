@@ -19,12 +19,18 @@ CREATE TABLE tenants (
 CREATE TABLE api_keys (
     id VARCHAR(36) PRIMARY KEY,
     tenant_id VARCHAR(36) REFERENCES tenants(id) ON DELETE CASCADE,
+    user_id VARCHAR(36),
     name VARCHAR(255) NOT NULL,
     key_hash VARCHAR(64) UNIQUE NOT NULL,
     is_active BOOLEAN NOT NULL DEFAULT TRUE,
     permissions JSON NOT NULL DEFAULT '{}',
+    quota_limit INTEGER,
+    current_quota_usage INTEGER NOT NULL DEFAULT 0,
     expires_at TIMESTAMP WITH TIME ZONE,
     last_used_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now(),
     updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT now()
 );
+
+-- Create index for user lookups
+CREATE INDEX ix_api_keys_user_id ON api_keys (user_id, tenant_id);

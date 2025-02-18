@@ -23,7 +23,6 @@ settings = get_settings()
 
 # Security schemes
 api_key_header = APIKeyHeader(name="X-API-Key", auto_error=True)
-tenant_id_header = APIKeyHeader(name="X-Tenant-ID", auto_error=True)
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
@@ -92,12 +91,13 @@ class AuthService:
         """Validate an API key and return the associated API key record"""
         key_hash = AuthService.hash_api_key(api_key)
 
-        # Query the API key
+        # Query the API key with all related data
         result = await session.execute(
             text("""
-            SELECT ak.id, ak.tenant_id, ak.name, ak.key_hash, 
+            SELECT ak.id, ak.tenant_id, ak.user_id, ak.name, ak.key_hash, 
                    ak.is_active, ak.permissions, ak.expires_at, 
                    ak.last_used_at, ak.created_at, ak.updated_at,
+                   ak.quota_limit, ak.current_quota_usage,
                    t.is_active as tenant_is_active
             FROM api_keys ak
             JOIN tenants t ON t.id = ak.tenant_id
@@ -114,6 +114,7 @@ class AuthService:
         api_key_obj = APIKey(
             id=record.id,
             tenant_id=record.tenant_id,
+            user_id=record.user_id,
             name=record.name,
             key_hash=record.key_hash,
             is_active=record.is_active,
@@ -122,6 +123,8 @@ class AuthService:
             last_used_at=record.last_used_at,
             created_at=record.created_at,
             updated_at=record.updated_at,
+            quota_limit=record.quota_limit,
+            current_quota_usage=record.current_quota_usage,
         )
 
         # Validate key and tenant status
@@ -199,17 +202,13 @@ class AuthService:
 
 async def get_current_tenant_and_key(
     api_key: str = Security(api_key_header),
-    tenant_provided_id: str = Security(tenant_id_header),
 ) -> tuple[Tenant, APIKey]:
     """Dependency to get current tenant and API key"""
     if not api_key:
         raise InvalidAPIKeyError("API key is required")
-    if not tenant_provided_id:
-        raise InvalidAPIKeyError("Tenant ID is required")
 
-    logger.debug(
-        f"Validating tenant access - API Key: {api_key}, Tenant ID: {tenant_provided_id}"
-    )
+    logger.debug(f"Validating API key: {api_key}")
+    
     async with get_tenant_db_session("system") as session:
         api_key_obj = await AuthService.validate_api_key(api_key, session)
         if not api_key_obj:
@@ -217,34 +216,14 @@ async def get_current_tenant_and_key(
 
         logger.debug(f"Found API key object for tenant: {api_key_obj.tenant_id}")
 
-        query = text("SELECT * FROM tenants WHERE id = :tenant_id")
-        result = await session.execute(query, {"tenant_id": api_key_obj.tenant_id})
-        tenant = result.fetchone()
-
-        if not tenant:
-            logger.error(f"Tenant not found for ID: {api_key_obj.tenant_id}")
-            raise InvalidAPIKeyError("Tenant not found")
-
-        logger.debug(f"Found tenant: {tenant}")
-
-        # Verify that the provided tenant ID matches the one from the API key
-        if tenant.id != tenant_provided_id:
-            logger.error(f"Tenant ID mismatch: {tenant.id} != {tenant_provided_id}")
-            raise InvalidAPIKeyError("Invalid tenant ID")
-
-        # Instead of creating from row, get the tenant through SQLAlchemy
         tenant = await session.get(Tenant, api_key_obj.tenant_id)
         if not tenant:
             logger.error(f"Tenant not found for ID: {api_key_obj.tenant_id}")
             raise InvalidAPIKeyError("Tenant not found")
 
         logger.debug(
-            f"Found tenant through SQLAlchemy - ID: {tenant.id}, Name: {tenant.name}, Quota: {tenant.quota_limit}"
+            f"Found tenant - ID: {tenant.id}, Name: {tenant.name}, Quota: {tenant.quota_limit}"
         )
-
-        if tenant.id != tenant_provided_id:
-            logger.error(f"Tenant ID mismatch: {tenant.id} != {tenant_provided_id}")
-            raise InvalidAPIKeyError("Invalid tenant ID")
 
         # Ensure the tenant is loaded with all attributes
         await session.refresh(tenant)
