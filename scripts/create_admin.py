@@ -48,7 +48,7 @@ async def copy_tenants(source_session: AsyncSession, target_session: AsyncSessio
                         created_at, updated_at
                     ) VALUES (
                         :id, :name, :db_name, :is_active, :quota_limit,
-                        :current_quota_usage, :config::json,
+                        :current_quota_usage, CAST(:config AS json),
                         :created_at, :updated_at
                     )
                 """),

@@ -89,6 +89,7 @@ async def create_chat_completion(
                         "temperature": request.temperature,
                         "max_tokens": request.max_tokens,
                         "api_key_id": api_key.id,
+                        "provider": result.get("provider", "openai"),  # Add provider from model result
                     },
                     session=session,
                 )

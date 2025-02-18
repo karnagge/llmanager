@@ -85,7 +85,7 @@ def upgrade() -> None:
         sa.Column("total_tokens", sa.Integer(), nullable=False),
         sa.Column("cost", sa.Float(), nullable=False),
         sa.Column(
-            "metadata", postgresql.JSON(none_as_null=True), nullable=False, default={}
+            "usage_data", postgresql.JSON(none_as_null=True), nullable=False, default={}
         ),
     )
 

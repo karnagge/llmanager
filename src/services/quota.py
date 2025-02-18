@@ -89,58 +89,68 @@ class QuotaService:
             total_tokens = prompt_tokens + completion_tokens
             cost = calculate_token_cost(prompt_tokens, completion_tokens, model)
 
-            # Update Redis usage counters first
-            redis = await get_redis()
-            new_usage = await redis.update_token_quota(tenant_id, user_id, total_tokens)
-
             logger.debug(
                 "updating_usage",
                 tenant_id=tenant_id,
                 user_id=user_id,
                 total_tokens=total_tokens,
-                new_usage=new_usage,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
             )
 
-            # Update tenant in system database
+            # First update Redis counters
+            redis = await get_redis()
+            new_usage = await redis.update_token_quota(tenant_id, user_id, total_tokens)
+
+            # Update tenant quota in system database
             tenant = await session.get(Tenant, tenant_id)
             if not tenant:
-                logger.error("tenant_not_found", tenant_id=tenant_id)
+                logger.error("tenant_not_found_update", tenant_id=tenant_id)
                 raise ValueError(f"Tenant not found: {tenant_id}")
 
             tenant.current_quota_usage = new_usage["tenant_usage"]
             await session.commit()
+            logger.debug(
+                "tenant_quota_updated",
+                tenant_id=tenant_id,
+                current_usage=new_usage["tenant_usage"],
+            )
 
-            # Update user and create usage log in tenant database
+            # Update user quota and usage log in tenant database
             async with get_tenant_db_session(tenant_id) as tenant_session:
-                # Get user
                 user = await tenant_session.get(User, user_id)
                 if not user:
-                    logger.error("user_not_found", user_id=user_id, tenant_id=tenant_id)
+                    logger.error(
+                        "user_not_found_update", user_id=user_id, tenant_id=tenant_id
+                    )
                     raise ValueError(f"User not found: {user_id}")
 
-                # Update user usage
+                # Update user's quota usage
                 user.current_quota_usage = new_usage["user_usage"]
 
                 # Create usage log entry
                 usage_log = UsageLog(
-                    id=request_id,
+                    id=request_id,  # Use request_id as id since it's a UUID
                     user_id=user_id,
+                    request_id=request_id,  # Also set request_id field
                     model=model,
+                    provider=metadata.get("provider", "openai"),  # Default to openai if not specified
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     total_tokens=total_tokens,
                     cost=cost,
-                    metadata=metadata or {},
+                    usage_data=metadata or {},  # Renamed from metadata to match model field name
                 )
                 tenant_session.add(usage_log)
 
-                # Commit changes to tenant database
+                # Save user updates and usage log
                 await tenant_session.commit()
                 logger.debug(
-                    "tenant_usage_updated",
+                    "user_quota_updated",
                     tenant_id=tenant_id,
                     user_id=user_id,
-                    new_usage=new_usage,
+                    current_usage=new_usage["user_usage"],
+                    total_tokens=total_tokens,
                 )
 
             # Check threshold without transaction
