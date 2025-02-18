@@ -1,6 +1,8 @@
+import traceback
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List, Optional
 
+import openai.error
 from langchain.chat_models import AzureChatOpenAI, ChatOpenAI
 from langchain.schema import AIMessage, ChatMessage, HumanMessage, SystemMessage
 
@@ -64,17 +66,52 @@ class OpenAIProvider(BaseModelProvider):
     ) -> Dict[str, Any]:
         """Generate text using OpenAI API"""
         try:
+            logger.debug(
+                "openai_request",
+                model=model,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                message_count=len(messages),
+            )
+
             self.client.model_name = model
             self.client.temperature = temperature
             if max_tokens:
                 self.client.max_tokens = max_tokens
 
             langchain_messages = self._convert_messages(messages)
-            response = await self.client.agenerate([langchain_messages])
+
+            try:
+                response = await self.client.agenerate([langchain_messages])
+            except (
+                openai.error.APIError,
+                openai.error.Timeout,
+                openai.error.RateLimitError,
+                openai.error.InvalidRequestError,
+                openai.error.AuthenticationError,
+                openai.error.ServiceUnavailableError,
+            ) as e:
+                logger.error(
+                    "openai_api_error",
+                    error=str(e),
+                    error_type=e.__class__.__name__,
+                    http_status=getattr(e, "http_status", None),
+                    code=getattr(e, "code", None),
+                    should_retry=getattr(e, "should_retry", None),
+                )
+                raise
+            except Exception as e:
+                logger.error(
+                    "openai_unexpected_error",
+                    error=str(e),
+                    error_type=e.__class__.__name__,
+                    traceback=traceback.format_exc(),
+                )
+                raise
 
             generation = response.generations[0][0]
 
-            return {
+            result = {
                 "content": generation.text,
                 "usage": {
                     "prompt_tokens": response.llm_output["token_usage"][
@@ -86,8 +123,17 @@ class OpenAIProvider(BaseModelProvider):
                     "total_tokens": response.llm_output["token_usage"]["total_tokens"],
                 },
             }
+            logger.debug("openai_response_success", result=result)
+            return result
+
         except Exception as e:
-            logger.error("openai_api_error", error=str(e), model=model)
+            logger.error(
+                "openai_general_error",
+                error=str(e),
+                error_type=e.__class__.__name__,
+                model=model,
+                traceback=traceback.format_exc(),
+            )
             raise
 
     async def count_tokens(self, messages: List[Dict[str, str]], model: str) -> int:
@@ -157,8 +203,6 @@ class ModelService:
                 deployment_name=settings.AZURE_DEPLOYMENT_NAME,
             )
 
-        # Add other providers as needed
-
     async def generate(
         self,
         messages: List[Dict[str, str]],
@@ -166,18 +210,7 @@ class ModelService:
         provider: Optional[ModelProvider] = None,
         **kwargs: Any,
     ) -> Dict[str, Any]:
-        """
-        Generate text using specified model and provider
-
-        Args:
-            messages: List of message dictionaries
-            model: Model identifier
-            provider: Optional specific provider to use
-            **kwargs: Additional generation parameters
-
-        Returns:
-            Dict containing generated text and usage statistics
-        """
+        """Generate text using specified model and provider"""
         if not provider:
             provider = self._get_default_provider(model)
 
@@ -189,19 +222,29 @@ class ModelService:
             )
 
         try:
-            return await self.providers[provider].generate(messages, model, **kwargs)
+            logger.debug(
+                "model_generation_start",
+                provider=provider,
+                model=model,
+                message_count=len(messages),
+            )
+            result = await self.providers[provider].generate(messages, model, **kwargs)
+            logger.debug(
+                "model_generation_success",
+                provider=provider,
+                model=model,
+                token_usage=result.get("usage", {}),
+            )
+            return result
         except Exception as e:
             logger.error(
-                "model_generation_error", error=str(e), provider=provider, model=model
+                "model_generation_error",
+                error=str(e),
+                error_type=e.__class__.__name__,
+                provider=provider,
+                model=model,
+                traceback=traceback.format_exc(),
             )
-
-            if settings.FALLBACK_MODEL and model != settings.FALLBACK_MODEL:
-                logger.info(
-                    "attempting_fallback_model",
-                    original_model=model,
-                    fallback_model=settings.FALLBACK_MODEL,
-                )
-                return await self.generate(messages, settings.FALLBACK_MODEL, **kwargs)
             raise
 
     async def count_tokens(
@@ -210,17 +253,7 @@ class ModelService:
         model: str,
         provider: Optional[ModelProvider] = None,
     ) -> int:
-        """
-        Count tokens in the input
-
-        Args:
-            messages: List of message dictionaries
-            model: Model identifier
-            provider: Optional specific provider to use
-
-        Returns:
-            Number of tokens in the input
-        """
+        """Count tokens in the input"""
         if not provider:
             provider = self._get_default_provider(model)
 
@@ -235,7 +268,6 @@ class ModelService:
 
     def _get_default_provider(self, model: str) -> ModelProvider:
         """Get default provider for a model"""
-        # Add logic to determine appropriate provider based on model
         return ModelProvider.OPENAI
 
 

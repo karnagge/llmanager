@@ -1,9 +1,3 @@
--- Create system database
-CREATE DATABASE tenant_system;
-
--- Connect to tenant_system
-\c tenant_system;
-
 -- Create enums first
 CREATE TYPE user_role AS ENUM ('admin', 'user', 'readonly');
 CREATE TYPE model_provider AS ENUM ('openai', 'azure', 'google', 'aws', 'local');
