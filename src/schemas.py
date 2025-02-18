@@ -169,8 +169,26 @@ class HTTPValidationError(BaseModel):
     detail: List[Dict[str, Any]]
 
 
+class ErrorDetail(BaseModel):
+    message: str
+    required: Optional[List[str]] = None
+    granted: Optional[List[str]] = None
+    tip: Optional[str] = None
+
 class ErrorResponse(BaseModel):
-    error: Dict[str, Any]
+    error: ErrorDetail
+
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "error": {
+                    "message": "Insufficient permissions",
+                    "required": ["admin:users:read"],
+                    "granted": ["user:read", "metrics:view"],
+                    "tip": "Check the API key permissions documentation at /docs/PERMISSIONS.md"
+                }
+            }
+        }
 
 
 # Model Response Schemas
