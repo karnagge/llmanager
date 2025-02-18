@@ -10,7 +10,7 @@ logger = get_logger(__name__)
 api_router = APIRouter()
 
 # Include route modules
-api_router.include_router(llm.router, prefix="/v1", tags=["LLM API"])
+api_router.include_router(llm.router, tags=["LLM API"])
 
 api_router.include_router(admin.router, prefix="/admin", tags=["Administration"])
 

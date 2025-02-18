@@ -1,4 +1,5 @@
 import json
+import uuid
 from typing import Dict, Optional
 
 import httpx
@@ -129,17 +130,18 @@ class QuotaService:
                 user.current_quota_usage = new_usage["user_usage"]
 
                 # Create usage log entry
+                # Create usage log with unique ID
                 usage_log = UsageLog(
-                    id=request_id,  # Use request_id as id since it's a UUID
+                    id=str(uuid.uuid4()),  # Generate unique ID for primary key
                     user_id=user_id,
-                    request_id=request_id,  # Also set request_id field
+                    request_id=request_id,  # Use the provided request ID
                     model=model,
                     provider=metadata.get("provider", "openai"),  # Default to openai if not specified
                     prompt_tokens=prompt_tokens,
                     completion_tokens=completion_tokens,
                     total_tokens=total_tokens,
                     cost=cost,
-                    usage_data=metadata or {},  # Renamed from metadata to match model field name
+                    usage_data=metadata or {},  # Store complete metadata
                 )
                 tenant_session.add(usage_log)
 

@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, HTTPException
 
 from src.core.auth import get_current_tenant_and_key
@@ -84,7 +86,7 @@ async def create_chat_completion(
                     prompt_tokens=result["usage"]["prompt_tokens"],
                     completion_tokens=result["usage"]["completion_tokens"],
                     model=request.model,
-                    request_id=api_key.id,
+                    request_id=f"{uuid.uuid4()}",  # Generate unique request ID
                     metadata={
                         "temperature": request.temperature,
                         "max_tokens": request.max_tokens,
