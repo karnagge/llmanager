@@ -38,7 +38,11 @@ class OpenAIProvider(BaseModelProvider):
     """OpenAI API provider"""
 
     def __init__(self, api_key: str):
-        self.client = ChatOpenAI(api_key=api_key, temperature=0.7, request_timeout=60)
+        # Set the API key in the environment for LangChain
+        import os
+
+        os.environ["OPENAI_API_KEY"] = api_key
+        self.client = ChatOpenAI(temperature=0.7, request_timeout=60)
 
     def _convert_messages(self, messages: List[Dict[str, str]]) -> List[ChatMessage]:
         """Convert dict messages to Langchain format"""
@@ -131,10 +135,19 @@ class ModelService:
     def _initialize_providers(self) -> None:
         """Initialize configured model providers"""
         # OpenAI
+        logger.debug(
+            f"Initializing providers, OPENAI_API_KEY present: {bool(settings.OPENAI_API_KEY)}"
+        )
         if settings.OPENAI_API_KEY:
-            self.providers[ModelProvider.OPENAI] = OpenAIProvider(
-                api_key=settings.OPENAI_API_KEY.get_secret_value()
-            )
+            logger.debug("Initializing OpenAI provider")
+            try:
+                self.providers[ModelProvider.OPENAI] = OpenAIProvider(
+                    api_key=settings.OPENAI_API_KEY.get_secret_value()
+                )
+                logger.debug("OpenAI provider initialized successfully")
+            except Exception as e:
+                logger.error(f"Failed to initialize OpenAI provider: {str(e)}")
+                raise
 
         # Azure
         if settings.AZURE_API_KEY:

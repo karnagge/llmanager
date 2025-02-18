@@ -4,6 +4,8 @@ from typing import List, Optional
 from pydantic import PostgresDsn, RedisDsn, SecretStr, validator
 from pydantic_settings import BaseSettings
 
+from src.core.logging import get_logger
+
 
 class Settings(BaseSettings):
     # Project settings
@@ -98,4 +100,9 @@ class Settings(BaseSettings):
 @lru_cache
 def get_settings() -> Settings:
     """Get cached settings instance"""
-    return Settings()
+    settings = Settings()
+    logger = get_logger(__name__)
+    logger.debug(
+        f"Loaded settings with OpenAI API key present: {bool(settings.OPENAI_API_KEY)}"
+    )
+    return settings

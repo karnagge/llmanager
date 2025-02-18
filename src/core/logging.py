@@ -5,32 +5,29 @@ from typing import Any, Dict
 import structlog
 from pythonjsonlogger import jsonlogger
 
-from src.core.config import get_settings
+# Initialize with default log level
+root_logger = logging.getLogger()
+root_logger.handlers = []
 
-settings = get_settings()
+# Configure JSON formatter
+json_formatter = jsonlogger.JsonFormatter(
+    fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+)
+
+# Configure console handler
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(json_formatter)
+
+# Set default log level
+root_logger.setLevel(logging.INFO)
+root_logger.addHandler(console_handler)
 
 
-def setup_logging() -> None:
+def setup_logging(log_level: str = "INFO") -> None:
     """Configure structured logging for the application"""
-
-    # Remove existing handlers
-    root_logger = logging.getLogger()
-    root_logger.handlers = []
-
-    # Configure JSON formatter
-    json_formatter = jsonlogger.JsonFormatter(
-        fmt="%(asctime)s %(levelname)s %(name)s %(message)s",
-        datefmt="%Y-%m-%d %H:%M:%S",
-    )
-
-    # Configure console handler
-    console_handler = logging.StreamHandler(sys.stdout)
-    console_handler.setFormatter(json_formatter)
-
-    # Set log level from settings
-    log_level = getattr(logging, settings.LOG_LEVEL.upper())
-    root_logger.setLevel(log_level)
-    root_logger.addHandler(console_handler)
+    # Update log level if provided
+    root_logger.setLevel(getattr(logging, log_level.upper()))
 
     # Configure structlog
     structlog.configure(

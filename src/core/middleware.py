@@ -53,6 +53,7 @@ class TenantMiddleware(BaseHTTPMiddleware):
         # Skip tenant check for public endpoints
         if request.url.path in [
             "/",
+            "/api/v1/health",
             "/health",
             "/metrics",
             "/api/docs",

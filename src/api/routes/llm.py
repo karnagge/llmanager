@@ -2,6 +2,9 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from src.core.auth import get_current_tenant_and_key
 from src.core.database import get_tenant_db_session
+from src.core.logging import get_logger
+
+logger = get_logger(__name__)
 from src.models.system import APIKey, Tenant
 from src.schemas import (
     ChatCompletionChoice,
@@ -27,8 +30,21 @@ async def create_chat_completion(
     tenant, api_key = tenant_key
 
     # Get services
-    model_service = await get_model_service()
-    quota_service = await get_quota_service()
+    try:
+        model_service = await get_model_service()
+        logger.debug(f"Model service providers: {list(model_service.providers.keys())}")
+        if not model_service.providers:
+            raise HTTPException(
+                status_code=500,
+                detail="No model providers configured. Check your OpenAI API key configuration.",
+            )
+        quota_service = await get_quota_service()
+    except Exception as e:
+        logger.error(f"Failed to initialize services: {str(e)}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to initialize services: {str(e)}",
+        )
 
     async with get_tenant_db_session(tenant.id) as session:
         # Count tokens in the request
