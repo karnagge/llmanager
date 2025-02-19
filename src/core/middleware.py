@@ -50,21 +50,10 @@ class TenantMiddleware(BaseHTTPMiddleware):
     async def dispatch(
         self, request: Request, call_next: RequestResponseEndpoint
     ) -> Response:
-        # Skip tenant check for public endpoints
-        if request.url.path in [
-            "/",
-            "/api/v1/health",
-            "/health",
-            "/metrics",
-            "/api/docs",
-            "/api/redoc",
-            "/openapi.json",
-        ] or request.url.path.startswith("/static/"):
-            return await call_next(request)
-
-        # Skip tenant checks for public endpoints and handle tenant validation in auth
+        # Skip tenant checks for public endpoints and handle tenant validation in auth for protected endpoints
         if request.url.path not in [
             "/api/v1/health",
+            "/api/v1/auth/login",   # Login endpoint
             "/health",
             "/metrics",
             "/api/docs",
