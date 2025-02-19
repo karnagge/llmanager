@@ -6,7 +6,7 @@ import {
   LayoutDashboard,
   Users,
   UsersRound,
-  ChartBar,
+  BarChart3,
   Settings,
   Database,
 } from "lucide-react";
@@ -41,7 +41,7 @@ const sidebarItems: SidebarItem[] = [
   {
     title: "Métricas",
     href: "/metrics",
-    icon: <ChartBar className="h-5 w-5" />,
+    icon: <BarChart3 className="h-5 w-5" />,
   },
   {
     title: "Configurações",
