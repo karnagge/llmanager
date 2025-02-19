@@ -54,7 +54,7 @@ async def create_tenant(
             session.add(tenant)
             await session.commit()
 
-            return TenantResponse.model_validate(tenant)
+            return TenantResponse.model_validate(tenant.__dict__)
 
     except DatabaseError as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -71,7 +71,7 @@ async def list_tenants(
     async with get_tenant_db_session("system") as session:
         result = await session.execute(select(Tenant).offset(offset).limit(limit))
         tenants = result.scalars().all()
-        return [TenantResponse.model_validate(t) for t in tenants]
+        return [TenantResponse.model_validate(t.__dict__) for t in tenants]
 
 
 @router.put("/tenants/{tenant_id}", response_model=TenantResponse)
@@ -103,7 +103,7 @@ async def update_tenant(
             tenant.config = update_data.config
 
         await session.commit()
-        return TenantResponse.model_validate(tenant)
+        return TenantResponse.model_validate(tenant.__dict__)
 
 
 # API Key Routes

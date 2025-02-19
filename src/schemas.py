@@ -96,6 +96,7 @@ class TenantUpdate(BaseModel):
 class TenantResponse(BaseModel):
     id: str
     name: str
+    db_name: str
     quota_limit: int
     current_quota_usage: int
     is_active: bool
