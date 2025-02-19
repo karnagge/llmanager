@@ -5,6 +5,8 @@ from pydantic import BaseModel, EmailStr
 class Token(BaseModel):
     access_token: str
     token_type: str
+    expires_in: Optional[int] = None
+    refresh_token: Optional[str] = None
 
 class TokenData(BaseModel):
     sub: str | None = None
@@ -123,6 +125,9 @@ class UserCreate(BaseModel):
     email: EmailStr
     password: str
     name: str
+    role: Optional[str] = None  # Added role field
+    quota_limit: Optional[int] = None
+    settings: Optional[Dict] = None
 
 class UserUpdate(BaseModel):
     email: Optional[EmailStr] = None
@@ -130,6 +135,8 @@ class UserUpdate(BaseModel):
     password: Optional[str] = None
     is_active: Optional[bool] = None
     quota_limit: Optional[int] = None
+    role: Optional[str] = None  # Added role field
+    settings: Optional[Dict] = None
 
 class UserResponse(BaseModel):
     id: str
@@ -137,8 +144,13 @@ class UserResponse(BaseModel):
     name: str
     is_active: bool
     role: str
-    quota_limit: Optional[int]
+    quota_limit: Optional[int] = None
     current_quota_usage: int
+    settings: Dict
+    last_login: Optional[str] = None  # Added last_login field
+
+    class Config:
+        from_attributes = True  # Enable ORM mode for SQLAlchemy models
 
 # Webhook schemas
 class WebhookCreate(BaseModel):
