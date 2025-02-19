@@ -13,7 +13,11 @@ class ApiClient {
       },
     });
 
-    this.setupInterceptors();
+    // In client-side context only
+    if (typeof window !== 'undefined') {
+      this.setupInterceptors();
+      this.initializeFromStorage();
+    }
   }
 
   public static getInstance(): ApiClient {
@@ -23,17 +27,33 @@ class ApiClient {
     return ApiClient.instance;
   }
 
+  private initializeFromStorage() {
+    if (typeof window === 'undefined') return;
+
+    const token = window.localStorage.getItem('token');
+    const apiKey = window.localStorage.getItem('apiKey');
+
+    if (token) {
+      this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    }
+    if (apiKey) {
+      this.client.defaults.headers.common['X-API-Key'] = apiKey;
+    }
+  }
+
   private setupInterceptors() {
     this.client.interceptors.request.use(
       (config) => {
+        if (typeof window === 'undefined') return config;
+
         // Add API key header
-        const apiKey = localStorage.getItem('apiKey');
+        const apiKey = window.localStorage.getItem('apiKey');
         if (apiKey) {
           config.headers['X-API-Key'] = apiKey;
         }
 
         // Add Authorization header
-        const token = localStorage.getItem('token');
+        const token = window.localStorage.getItem('token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
@@ -47,9 +67,8 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
-        if (error.response?.status === 401) {
-          localStorage.removeItem('token');
-          localStorage.removeItem('apiKey');
+        if (error.response?.status === 401 && typeof window !== 'undefined') {
+          this.clearAuth();
           window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -119,13 +138,28 @@ class ApiClient {
 
   // Helper method to set API key
   public setApiKey(apiKey: string) {
-    localStorage.setItem('apiKey', apiKey);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('apiKey', apiKey);
+      this.client.defaults.headers.common['X-API-Key'] = apiKey;
+    }
+  }
+
+  // Helper method to set auth token
+  public setToken(token: string) {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem('token', token);
+      this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    }
   }
 
   // Helper method to clear auth data
   public clearAuth() {
-    localStorage.removeItem('token');
-    localStorage.removeItem('apiKey');
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem('token');
+      window.localStorage.removeItem('apiKey');
+      delete this.client.defaults.headers.common['Authorization'];
+      delete this.client.defaults.headers.common['X-API-Key'];
+    }
   }
 }
 

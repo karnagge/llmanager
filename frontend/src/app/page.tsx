@@ -1,22 +1,21 @@
-"use client";
+'use client';
 
-import { useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { useAuth } from "@/providers/auth-provider";
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/hooks/auth/use-auth';
 
-export default function Home() {
+export default function HomePage() {
   const router = useRouter();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated } = useAuth();
 
   useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated) {
-        router.replace("/dashboard");
-      } else {
-        router.replace("/login");
-      }
+    // Only redirect to dashboard if authenticated
+    // Otherwise, let the middleware handle the redirect to login
+    if (isAuthenticated) {
+      router.push('/dashboard');
     }
-  }, [isLoading, isAuthenticated, router]);
+  }, [isAuthenticated, router]);
 
-  return null; // No need to render anything as we're redirecting
+  // Return null since we're either redirecting to dashboard or letting middleware handle login redirect
+  return null;
 }

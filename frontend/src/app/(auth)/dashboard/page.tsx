@@ -30,7 +30,7 @@ export default function DashboardPage() {
   const { formattedData, categories } = useFormattedMetrics(requestData);
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6">
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <MetricCard
           title="Total de Usuários"

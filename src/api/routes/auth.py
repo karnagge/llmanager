@@ -5,12 +5,12 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.auth import AuthService
+from src.core.auth import AuthService, get_current_user
 from src.core.config import get_settings
 from src.core.database import get_tenant_db_session
 from src.models.system import APIKey
 from src.models.tenant import User, UserRole
-from src.schemas import AuthResponse, LoginData, RegisterData, Token
+from src.schemas import AuthResponse, LoginData, RegisterData, Token, UserData
 
 router = APIRouter()
 settings = get_settings()
@@ -144,3 +144,13 @@ async def logout():
     # JWT tokens are stateless, so we just return success
     # Client should remove the token
     return {"message": "Successfully logged out"}
+
+@router.get("/me", response_model=UserData)
+async def get_profile(current_user: User = Depends(get_current_user)) -> UserData:
+    """Get current user profile"""
+    return {
+        "id": current_user.id,
+        "email": current_user.email,
+        "name": current_user.name,
+        "role": current_user.role.value
+    }

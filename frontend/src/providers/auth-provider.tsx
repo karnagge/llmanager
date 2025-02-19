@@ -1,9 +1,10 @@
 "use client";
 
-import { createContext, useContext, useEffect } from "react";
+import { createContext, useContext, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/stores/auth-store";
 import type { User } from "@/services/auth/auth-service";
+import { Loader2 } from "lucide-react";
 
 interface AuthContextType {
   user: User | null;
@@ -36,11 +37,10 @@ export function AuthProvider({ children, initialState }: AuthProviderProps) {
     register: storeRegister,
   } = useAuthStore();
 
+  // Initialize auth state when component mounts
   useEffect(() => {
-    if (initialState) {
+    if (typeof window !== 'undefined') {
       initialize(initialState);
-    } else {
-      initialize();
     }
   }, [initialize, initialState]);
 
@@ -67,6 +67,28 @@ export function AuthProvider({ children, initialState }: AuthProviderProps) {
     logout,
     register,
   };
+
+  // Handle loading state with useEffect to avoid hydration mismatch
+  const [showLoading, setShowLoading] = useState(false);
+  
+  useEffect(() => {
+    if (isLoading) {
+      setShowLoading(true);
+    } else {
+      setShowLoading(false);
+    }
+  }, [isLoading]);
+
+  if (showLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-2">
+          <Loader2 className="h-8 w-8 animate-spin text-zinc-500" />
+          <p className="text-sm text-zinc-500">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

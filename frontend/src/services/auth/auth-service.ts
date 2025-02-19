@@ -24,7 +24,7 @@ export interface RegisterData extends LoginCredentials {
 }
 
 export class AuthService {
-  private static readonly basePath = "/api/auth";
+  private static readonly basePath = "/api/v1/auth";
 
   /**
    * Login with email and password

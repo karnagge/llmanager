@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { AuthService, type User, type LoginCredentials, type RegisterData } from "@/services/auth/auth-service";
+import { AuthService, type User } from "@/services/auth/auth-service";
 import { api } from "@/lib/api";
 
 interface AuthState {
@@ -28,35 +28,49 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
 
     try {
-      const token = localStorage.getItem("token");
-      const apiKey = localStorage.getItem("apiKey");
-      
+      if (typeof window === 'undefined') {
+        set({ isLoading: false });
+        return;
+      }
+
+      // Only try to get profile if we have both token and apiKey
+      const token = window.localStorage.getItem('token');
+      const apiKey = window.localStorage.getItem('apiKey');
+
       if (!token || !apiKey) {
         set({ isLoading: false });
         return;
       }
 
-      // Set the API key in the API client
+      // Set auth headers before making request
+      api.setToken(token);
       api.setApiKey(apiKey);
 
-      const user = await AuthService.getProfile();
-      set({ user, isAuthenticated: true, isLoading: false });
+      const response = await AuthService.getProfile();
+      if (response) {
+        set({ user: response, isAuthenticated: true, isLoading: false });
+      } else {
+        throw new Error('Failed to get user profile');
+      }
     } catch (error) {
       console.error("Failed to initialize auth:", error);
-      localStorage.removeItem("token");
-      localStorage.removeItem("apiKey");
+      api.clearAuth();
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },
 
   login: async (email: string, password: string) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
     try {
       set({ isLoading: true });
       const { user, token, apiKey } = await AuthService.login({ email, password });
-      localStorage.setItem("token", token);
-      localStorage.setItem("apiKey", apiKey);
-      api.setApiKey(apiKey);
-      set({ user, isAuthenticated: true });
+      if (token && apiKey) {
+        api.setToken(token);
+        api.setApiKey(apiKey);
+        set({ user, isAuthenticated: true });
+      }
     } catch (error) {
       throw error;
     } finally {
@@ -71,20 +85,22 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     } catch (error) {
       console.error("Failed to logout:", error);
     } finally {
-      localStorage.removeItem("token");
-      localStorage.removeItem("apiKey");
       api.clearAuth();
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },
 
   register: async (email: string, password: string, name: string) => {
+    if (typeof window === 'undefined') {
+      return;
+    }
     try {
       set({ isLoading: true });
       const { token, apiKey } = await AuthService.register({ email, password, name });
-      localStorage.setItem("token", token);
-      localStorage.setItem("apiKey", apiKey);
-      api.setApiKey(apiKey);
+      if (token && apiKey) {
+        api.setToken(token);
+        api.setApiKey(apiKey);
+      }
     } catch (error) {
       throw error;
     } finally {

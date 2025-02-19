@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from typing import Dict, Optional, Union
 
 from fastapi import Depends, HTTPException, Security
-from fastapi.security import APIKeyHeader
+from fastapi.security import APIKeyHeader, HTTPBearer
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy import text
@@ -279,3 +279,14 @@ def check_permissions(required_permissions: set[str]):
 
 # Convenience dependencies
 get_current_tenant = AuthService.get_current_tenant
+# Bearer token auth scheme
+bearer_scheme = HTTPBearer()
+
+async def get_current_user(
+    tenant_key: tuple[Tenant, APIKey] = Depends(get_current_tenant_and_key),
+    token: str = Depends(bearer_scheme)
+) -> User:
+    """Dependency to get current user from token"""
+    tenant, _ = tenant_key
+    return await AuthService.get_current_user(tenant.id, token.credentials)
+    return await AuthService.get_current_user(tenant.id, token)
