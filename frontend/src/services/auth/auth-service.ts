@@ -11,6 +11,7 @@ export interface User {
 export interface AuthResponse {
   user: User;
   token: string;
+  apiKey: string;  // Added API key to auth response
 }
 
 export interface LoginCredentials {
@@ -30,6 +31,9 @@ export class AuthService {
    */
   static async login(credentials: LoginCredentials): Promise<AuthResponse> {
     const response = await api.post<AuthResponse>(`${this.basePath}/login`, credentials);
+    if (response.data.apiKey) {
+      api.setApiKey(response.data.apiKey);
+    }
     return response.data;
   }
 
@@ -38,6 +42,9 @@ export class AuthService {
    */
   static async register(data: RegisterData): Promise<AuthResponse> {
     const response = await api.post<AuthResponse>(`${this.basePath}/register`, data);
+    if (response.data.apiKey) {
+      api.setApiKey(response.data.apiKey);
+    }
     return response.data;
   }
 
@@ -54,6 +61,7 @@ export class AuthService {
    */
   static async logout(): Promise<void> {
     await api.post(`${this.basePath}/logout`, {});
+    api.clearAuth();  // Clear both token and API key
   }
 
   /**

@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { AuthService, type User, type LoginCredentials, type RegisterData } from "@/services/auth/auth-service";
+import { api } from "@/lib/api";
 
 interface AuthState {
   user: User | null;
@@ -28,16 +29,22 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     try {
       const token = localStorage.getItem("token");
-      if (!token) {
+      const apiKey = localStorage.getItem("apiKey");
+      
+      if (!token || !apiKey) {
         set({ isLoading: false });
         return;
       }
+
+      // Set the API key in the API client
+      api.setApiKey(apiKey);
 
       const user = await AuthService.getProfile();
       set({ user, isAuthenticated: true, isLoading: false });
     } catch (error) {
       console.error("Failed to initialize auth:", error);
       localStorage.removeItem("token");
+      localStorage.removeItem("apiKey");
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },
@@ -45,8 +52,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   login: async (email: string, password: string) => {
     try {
       set({ isLoading: true });
-      const { user, token } = await AuthService.login({ email, password });
+      const { user, token, apiKey } = await AuthService.login({ email, password });
       localStorage.setItem("token", token);
+      localStorage.setItem("apiKey", apiKey);
+      api.setApiKey(apiKey);
       set({ user, isAuthenticated: true });
     } catch (error) {
       throw error;
@@ -63,6 +72,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       console.error("Failed to logout:", error);
     } finally {
       localStorage.removeItem("token");
+      localStorage.removeItem("apiKey");
+      api.clearAuth();
       set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },
@@ -70,7 +81,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   register: async (email: string, password: string, name: string) => {
     try {
       set({ isLoading: true });
-      await AuthService.register({ email, password, name });
+      const { token, apiKey } = await AuthService.register({ email, password, name });
+      localStorage.setItem("token", token);
+      localStorage.setItem("apiKey", apiKey);
+      api.setApiKey(apiKey);
     } catch (error) {
       throw error;
     } finally {

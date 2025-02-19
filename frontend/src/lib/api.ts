@@ -26,6 +26,13 @@ class ApiClient {
   private setupInterceptors() {
     this.client.interceptors.request.use(
       (config) => {
+        // Add API key header
+        const apiKey = localStorage.getItem('apiKey');
+        if (apiKey) {
+          config.headers['X-API-Key'] = apiKey;
+        }
+
+        // Add Authorization header
         const token = localStorage.getItem('token');
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
@@ -42,6 +49,7 @@ class ApiClient {
       async (error: AxiosError) => {
         if (error.response?.status === 401) {
           localStorage.removeItem('token');
+          localStorage.removeItem('apiKey');
           window.location.href = '/login';
         }
         return Promise.reject(error);
@@ -107,6 +115,17 @@ class ApiClient {
     } else {
       console.error('Erro:', error.message);
     }
+  }
+
+  // Helper method to set API key
+  public setApiKey(apiKey: string) {
+    localStorage.setItem('apiKey', apiKey);
+  }
+
+  // Helper method to clear auth data
+  public clearAuth() {
+    localStorage.removeItem('token');
+    localStorage.removeItem('apiKey');
   }
 }
 

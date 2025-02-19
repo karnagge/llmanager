@@ -159,7 +159,7 @@ curl -X POST http://localhost:8000/api/v1/chat/completions \\
                 ) or (
                     operation.get("tags")
                     and any(
-                        tag in ["LLM API", "Administration", "User Management"]
+                        tag in ["LLM API", "Administration", "User Management", "Metrics"]
                         for tag in operation["tags"]
                     )
                 ):

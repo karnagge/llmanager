@@ -1,242 +1,156 @@
-from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Dict, List, Optional
+from pydantic import BaseModel, EmailStr
 
-from pydantic import BaseModel, EmailStr, Field
+# Auth schemas
+class Token(BaseModel):
+    access_token: str
+    token_type: str
 
-from src.models.tenant import UserRole
+class TokenData(BaseModel):
+    sub: str | None = None
 
+class LoginData(BaseModel):
+    email: EmailStr
+    password: str
 
-# Base Models
-class TimestampMixin(BaseModel):
-    created_at: datetime
-    updated_at: datetime
+class RegisterData(LoginData):
+    name: str
 
-
-# User Schemas
-class UserCreate(BaseModel):
-    """User creation request"""
-
-    email: EmailStr = Field(..., description="User email")
-    password: str = Field(..., min_length=8, description="User password")
-    name: str = Field(..., description="User name")
-    role: UserRole = Field(default=UserRole.USER, description="User role")
-    quota_limit: Optional[int] = Field(None, description="User token quota limit")
-    settings: Dict = Field(default_factory=dict, description="User settings")
-
-
-class UserUpdate(BaseModel):
-    """User update request"""
-
-    name: Optional[str] = Field(None, description="User name")
-    password: Optional[str] = Field(None, min_length=8, description="New password")
-    role: Optional[UserRole] = Field(None, description="User role")
-    is_active: Optional[bool] = Field(None, description="User status")
-    quota_limit: Optional[int] = Field(None, description="User token quota limit")
-    settings: Optional[Dict] = Field(None, description="User settings")
-
-
-class UserResponse(BaseModel):
-    """User response"""
-
+class UserData(BaseModel):
     id: str
     email: str
     name: str
-    role: UserRole
-    is_active: bool
-    quota_limit: Optional[int]
-    current_quota_usage: int
-    settings: Dict
-    last_login: Optional[datetime]
-    created_at: datetime
-    updated_at: datetime
+    role: str
 
-    class Config:
-        from_attributes = True
-
-
-# Auth Schemas
-class Token(BaseModel):
-    """Token response"""
-
+class AuthResponse(BaseModel):
     access_token: str
     token_type: str
-    expires_in: int
-    refresh_token: Optional[str] = None
+    api_key: str
+    user: UserData
 
+# Error schemas
+class ValidationError(BaseModel):
+    loc: List[str]
+    msg: str
+    type: str
 
-class TokenData(BaseModel):
-    """Token data"""
-
-    sub: str
-    tenant_id: str
-    exp: datetime
-
-
-# Tenant Schemas
-class TenantBase(BaseModel):
-    name: str
-    quota_limit: int
-    config: Dict[str, Any] = {}
-
-
-class TenantCreate(TenantBase):
-    id: str
-    db_name: str
-
-
-class TenantUpdate(BaseModel):
-    """Tenant update request"""
-
-    name: Optional[str] = Field(None, description="Tenant name")
-    quota_limit: Optional[int] = Field(None, description="Token quota limit")
-    is_active: Optional[bool] = Field(None, description="Tenant status")
-    config: Optional[Dict] = Field(None, description="Tenant configuration")
-
-
-class TenantResponse(TenantBase, TimestampMixin):
-    id: str
-    db_name: str
-    is_active: bool
-    current_quota_usage: int
-
-    class Config:
-        from_attributes = True
-
-
-# API Key Schemas
-class APIKeyBase(BaseModel):
-    name: str
-    permissions: Dict[str, Any] = {}
-    quota_limit: Optional[int] = Field(None, description="API key token quota limit")
-
-
-class APIKeyCreate(APIKeyBase):
-    tenant_id: str
-    user_id: str = Field(..., description="Associated user ID")
-    expires_at: Optional[datetime] = Field(None, description="Expiration date")
-
-
-class APIKeyResponse(APIKeyBase, TimestampMixin):
-    id: str
-    tenant_id: str
-    user_id: str
-    key: Optional[str]  # Only included on creation
-    is_active: bool
-    expires_at: Optional[datetime] = None
-    last_used_at: Optional[datetime] = None
-    quota_limit: Optional[int] = None
-    current_quota_usage: int = 0
-
-    class Config:
-        from_attributes = True
-
-
-# Webhook Schemas
-class WebhookCreate(BaseModel):
-    """Webhook creation request"""
-
-    url: str = Field(..., description="Webhook URL")
-    events: List[str] = Field(..., description="Event types to subscribe to")
-    metadata: Dict = Field(default_factory=dict, description="Additional metadata")
-
-
-class WebhookUpdate(BaseModel):
-    """Webhook update request"""
-
-    url: Optional[str] = Field(None, description="Webhook URL")
-    events: Optional[List[str]] = Field(None, description="Event types")
-    is_active: Optional[bool] = Field(None, description="Webhook status")
-    metadata: Optional[Dict] = Field(None, description="Additional metadata")
-
-
-class WebhookResponse(BaseModel):
-    """Webhook response"""
-
-    id: str
-    url: str
-    events: List[str]
-    is_active: bool
-    metadata: Dict
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-# Error Responses
 class HTTPValidationError(BaseModel):
-    detail: List[Dict[str, Any]]
-
-
-class ErrorDetail(BaseModel):
-    message: str
-    required: Optional[List[str]] = None
-    granted: Optional[List[str]] = None
-    tip: Optional[str] = None
+    detail: List[ValidationError]
 
 class ErrorResponse(BaseModel):
-    error: ErrorDetail
+    detail: str
 
-    class Config:
-        json_schema_extra = {
-            "example": {
-                "error": {
-                    "message": "Insufficient permissions",
-                    "required": ["admin:users:read"],
-                    "granted": ["user:read", "metrics:view"],
-                    "tip": "Check the API key permissions documentation at /docs/PERMISSIONS.md"
-                }
-            }
-        }
-
-
-# Model Response Schemas
+# Model schemas
 class ModelInfo(BaseModel):
     id: str
-    object: str = "model"
     created: int
     owned_by: str
-    permission: List[Dict[str, Any]] = []
-    root: Optional[str] = None
-    parent: Optional[str] = None
-
+    permission: List[Dict]
+    root: str
+    parent: Optional[str]
 
 class ModelsResponse(BaseModel):
     data: List[ModelInfo]
-    object: str = "list"
 
-
-# Chat Schemas
+# Chat schemas
 class ChatMessage(BaseModel):
     role: str
     content: str
 
-
-class ChatCompletionRequest(BaseModel):
-    model: str
-    messages: List[ChatMessage]
-    temperature: Optional[float] = 0.7
-    max_tokens: Optional[int] = None
-    stream: Optional[bool] = False
-
-
 class ChatCompletionChoice(BaseModel):
     index: int
     message: ChatMessage
-    finish_reason: Optional[str] = None
-
+    finish_reason: str
 
 class ChatCompletionUsage(BaseModel):
     prompt_tokens: int
     completion_tokens: int
     total_tokens: int
 
+class ChatCompletionRequest(BaseModel):
+    model: str
+    messages: List[ChatMessage]
+    temperature: Optional[float] = 0.7
+    max_tokens: Optional[int] = None
 
 class ChatCompletionResponse(BaseModel):
     id: str
-    object: str = "chat.completion"
     created: int
     model: str
     choices: List[ChatCompletionChoice]
     usage: ChatCompletionUsage
+
+# Tenant schemas
+class TenantCreate(BaseModel):
+    id: str
+    name: str
+    quota_limit: int
+    config: Dict = {}
+
+class TenantUpdate(BaseModel):
+    name: Optional[str] = None
+    quota_limit: Optional[int] = None
+    is_active: Optional[bool] = None
+    config: Optional[Dict] = None
+
+class TenantResponse(BaseModel):
+    id: str
+    name: str
+    quota_limit: int
+    current_quota_usage: int
+    is_active: bool
+    config: Dict
+
+# API Key schemas
+class APIKeyCreate(BaseModel):
+    name: str
+    permissions: Dict
+    quota_limit: Optional[int] = None
+
+class APIKeyResponse(BaseModel):
+    id: str
+    name: str
+    key: str
+    permissions: Dict
+    quota_limit: Optional[int] = None
+    current_quota_usage: int
+
+# User schemas
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: str
+
+class UserUpdate(BaseModel):
+    email: Optional[EmailStr] = None
+    name: Optional[str] = None
+    password: Optional[str] = None
+    is_active: Optional[bool] = None
+    quota_limit: Optional[int] = None
+
+class UserResponse(BaseModel):
+    id: str
+    email: str
+    name: str
+    is_active: bool
+    role: str
+    quota_limit: Optional[int]
+    current_quota_usage: int
+
+# Webhook schemas
+class WebhookCreate(BaseModel):
+    url: str
+    secret: str
+    events: List[str]
+
+class WebhookUpdate(BaseModel):
+    url: Optional[str] = None
+    secret: Optional[str] = None
+    events: Optional[List[str]] = None
+    is_active: Optional[bool] = None
+
+class WebhookResponse(BaseModel):
+    id: str
+    url: str
+    events: List[str]
+    is_active: bool
