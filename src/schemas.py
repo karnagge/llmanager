@@ -10,10 +10,12 @@ class TokenData(BaseModel):
     sub: str | None = None
 
 class LoginData(BaseModel):
-    email: EmailStr
+    username: EmailStr  # Using username instead of email for OAuth2 compatibility
     password: str
 
-class RegisterData(LoginData):
+class RegisterData(BaseModel):  # Changed to not inherit from LoginData
+    email: EmailStr
+    password: str
     name: str
 
 class UserData(BaseModel):

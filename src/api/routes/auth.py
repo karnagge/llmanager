@@ -19,9 +19,9 @@ settings = get_settings()
 async def login(data: LoginData) -> AuthResponse:
     """Login user and return tokens"""
     async with get_tenant_db_session("admin") as session:
-        # Find user
+        # Find user by username (which is the email)
         result = await session.execute(
-            select(User).where(User.email == data.email)
+            select(User).where(User.email == data.username)  # Using username from form data
         )
         user = result.scalar_one_or_none()
 
