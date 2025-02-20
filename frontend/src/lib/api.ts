@@ -6,6 +6,8 @@ class ApiClient {
   private static instance: ApiClient;
 
   private constructor() {
+    console.log("[ApiClient] Initializing ApiClient");
+    
     this.client = axios.create({
       baseURL: process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000',
       headers: {
@@ -15,8 +17,11 @@ class ApiClient {
 
     // In client-side context only
     if (typeof window !== 'undefined') {
+      console.log("[ApiClient] Client-side context detected, setting up");
       this.setupInterceptors();
       this.initializeFromStorage();
+    } else {
+      console.log("[ApiClient] Server-side context detected, skipping setup");
     }
   }
 
@@ -28,38 +33,75 @@ class ApiClient {
   }
 
   private initializeFromStorage() {
-    if (typeof window === 'undefined') return;
+    try {
+      console.log("[ApiClient] Initializing from storage");
+      
+      if (typeof window === 'undefined') {
+        console.log("[ApiClient] Server-side context, skipping storage initialization");
+        return;
+      }
 
-    const token = window.localStorage.getItem('token');
-    const apiKey = window.localStorage.getItem('apiKey');
+      // Wrap storage access in try-catch
+      console.log("[ApiClient] Checking stored credentials");
+      let token, apiKey;
+      
+      try {
+        token = window.localStorage.getItem('token');
+        apiKey = window.localStorage.getItem('apiKey');
+      } catch (error) {
+        console.log("[ApiClient] Storage access error:", error);
+        return;
+      }
 
-    if (token) {
-      this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    }
-    if (apiKey) {
-      this.client.defaults.headers.common['X-API-Key'] = apiKey;
+      console.log("[ApiClient] Storage check:", {
+        hasToken: !!token,
+        hasApiKey: !!apiKey,
+        tokenStart: token ? token.substring(0, 10) + '...' : null
+      });
+
+      if (token) {
+        console.log("[ApiClient] Setting stored auth token");
+        this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+      }
+      if (apiKey) {
+        console.log("[ApiClient] Setting stored API key");
+        this.client.defaults.headers.common['X-API-Key'] = apiKey;
+      }
+    } catch (error) {
+      console.error("[ApiClient] Error in initializeFromStorage:", error);
     }
   }
 
   private setupInterceptors() {
+    console.log("[ApiClient] Setting up interceptors");
+    
+    // Skip interceptor setup in SSR
+    if (typeof window === 'undefined') {
+      console.log("[ApiClient] Server-side context, skipping interceptors setup");
+      return;
+    }
+
     this.client.interceptors.request.use(
       (config) => {
-        if (typeof window === 'undefined') return config;
-
+        console.log("[ApiClient] Processing request interceptor");
+        
         // Add API key header
         const apiKey = window.localStorage.getItem('apiKey');
         if (apiKey) {
+          console.log("[ApiClient] Adding API key header");
           config.headers['X-API-Key'] = apiKey;
         }
 
         // Add Authorization header
         const token = window.localStorage.getItem('token');
         if (token) {
+          console.log("[ApiClient] Adding Authorization header");
           config.headers.Authorization = `Bearer ${token}`;
         }
         return config;
       },
       (error) => {
+        console.error("[ApiClient] Request interceptor error:", error);
         return Promise.reject(error);
       }
     );
@@ -67,7 +109,8 @@ class ApiClient {
     this.client.interceptors.response.use(
       (response) => response,
       async (error: AxiosError) => {
-        if (error.response?.status === 401 && typeof window !== 'undefined') {
+        if (error.response?.status === 401) {
+          console.log("[ApiClient] 401 response, clearing auth and redirecting");
           this.clearAuth();
           window.location.href = '/login';
         }
@@ -137,29 +180,51 @@ class ApiClient {
   }
 
   // Helper method to set API key
+  // Helper method to set API key
   public setApiKey(apiKey: string) {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('apiKey', apiKey);
-      this.client.defaults.headers.common['X-API-Key'] = apiKey;
+    console.log("[ApiClient] Setting API key");
+    
+    // Skip in SSR context
+    if (typeof window === 'undefined') {
+      console.log("[ApiClient] Server-side context, skipping setApiKey");
+      return;
     }
+
+    window.localStorage.setItem('apiKey', apiKey);
+    this.client.defaults.headers.common['X-API-Key'] = apiKey;
+    console.log("[ApiClient] API key set successfully");
   }
 
   // Helper method to set auth token
   public setToken(token: string) {
-    if (typeof window !== 'undefined') {
-      window.localStorage.setItem('token', token);
-      this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    console.log("[ApiClient] Setting auth token");
+    
+    // Skip in SSR context
+    if (typeof window === 'undefined') {
+      console.log("[ApiClient] Server-side context, skipping setToken");
+      return;
     }
+
+    window.localStorage.setItem('token', token);
+    this.client.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+    console.log("[ApiClient] Auth token set successfully");
   }
 
   // Helper method to clear auth data
   public clearAuth() {
-    if (typeof window !== 'undefined') {
-      window.localStorage.removeItem('token');
-      window.localStorage.removeItem('apiKey');
-      delete this.client.defaults.headers.common['Authorization'];
-      delete this.client.defaults.headers.common['X-API-Key'];
+    console.log("[ApiClient] Clearing auth data");
+    
+    // Skip in SSR context
+    if (typeof window === 'undefined') {
+      console.log("[ApiClient] Server-side context, skipping clearAuth");
+      return;
     }
+
+    window.localStorage.removeItem('token');
+    window.localStorage.removeItem('apiKey');
+    delete this.client.defaults.headers.common['Authorization'];
+    delete this.client.defaults.headers.common['X-API-Key'];
+    console.log("[ApiClient] Auth data cleared successfully");
   }
 }
 

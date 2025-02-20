@@ -18,6 +18,7 @@ from src.schemas import (
     TenantResponse,
     TenantUpdate,
     UserCreate,
+    UserData,
     UserResponse,
     UserUpdate,
     WebhookCreate,
@@ -36,6 +37,7 @@ SCHEMA_MODELS = {
     "UserCreate": UserCreate,
     "UserUpdate": UserUpdate,
     "UserResponse": UserResponse,
+    "UserData": UserData,
     # Tenant schemas
     "TenantCreate": TenantCreate,
     "TenantUpdate": TenantUpdate,
